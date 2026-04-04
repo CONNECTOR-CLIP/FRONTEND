@@ -20,8 +20,8 @@ function LoginModal({ onClose }) {
         <div className="flex flex-col gap-6">
           <p className="text-[15px]  font-bold">다시 만나 반가워요.</p>
           <div className="flex flex-col gap-1">
-            <label className="text-regular font-light text-[12px] text-gray-700">
-              로그인
+            <label className="text-regular font-medium text-[12px] text-gray-700">
+              이메일
             </label>
             <input
               type="email"
@@ -30,7 +30,7 @@ function LoginModal({ onClose }) {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-regular font-medium text-gray-700 text-[12px]">
               비밀번호
             </label>
             <input
@@ -123,7 +123,10 @@ function LoginModal({ onClose }) {
         <p className="text-center text-sm text-[#64748B] mt-4">
           계정이 없으신가요?{" "}
           <span
-            onClick={() => { onClose(); navigate("/signup"); }}
+            onClick={() => {
+              onClose();
+              navigate("/signup");
+            }}
             className="text-[#0060AD] font-semibold cursor-pointer hover:underline"
           >
             회원가입

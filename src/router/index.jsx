@@ -3,6 +3,7 @@ import App from "@/App";
 import MainLayout from "@/layouts/MainLayout";
 import Home from "@/pages/Home";
 import LandingPage from "@/pages/LandingPage";
+import SignupPage from "@/pages/SignupPage";
 
 export const router = createBrowserRouter([
   {
@@ -14,6 +15,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <LandingPage /> },
           { path: "home", element: <Home /> },
+          { path: "signup", element: <SignupPage /> },
         ],
       },
     ],
