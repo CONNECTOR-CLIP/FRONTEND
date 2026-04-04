@@ -4,6 +4,7 @@ import MainLayout from "@/layouts/MainLayout";
 import Home from "@/pages/Home";
 import LandingPage from "@/pages/LandingPage";
 import SignupPage from "@/pages/SignupPage";
+import SignupCompletePage from "@/pages/SignupCompletePage";
 
 export const router = createBrowserRouter([
   {
@@ -16,6 +17,7 @@ export const router = createBrowserRouter([
           { index: true, element: <LandingPage /> },
           { path: "home", element: <Home /> },
           { path: "signup", element: <SignupPage /> },
+          { path: "signup/complete", element: <SignupCompletePage /> },
         ],
       },
     ],

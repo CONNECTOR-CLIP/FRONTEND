@@ -98,7 +98,7 @@ function SignupPage() {
       showToast("이메일을 인증해주세요.");
       return;
     }
-    navigate("/");
+    navigate("/signup/complete", { state: { nickname: form.nickname } });
   };
 
   const handleSendEmail = () => {
