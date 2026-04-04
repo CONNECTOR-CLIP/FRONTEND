@@ -7,7 +7,6 @@ const USED_EMAILS = ["test@test.com", "admin@clip.com"];
 
 function SignupPage() {
   const navigate = useNavigate();
-  const [agreed, setAgreed] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
@@ -97,10 +96,6 @@ function SignupPage() {
 
     if (!emailVerified) {
       showToast("이메일을 인증해주세요.");
-      return;
-    }
-    if (!agreed) {
-      showToast("약관에 동의해주세요.");
       return;
     }
     navigate("/");
@@ -265,39 +260,11 @@ function SignupPage() {
             )}
           </div>
 
-          {/* 약관 동의 */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setAgreed(!agreed)}
-              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                agreed
-                  ? "border-[#0060AD] bg-[#0060AD]"
-                  : "border-gray-300 bg-white"
-              }`}
-            >
-              {agreed && <div className="w-2 h-2 rounded-full bg-white" />}
-            </button>
-            <span className="text-sm text-gray-600">
-              <span className="text-[#0060AD] font-semibold cursor-pointer hover:underline">
-                이용약관
-              </span>{" "}
-              및{" "}
-              <span className="text-[#0060AD] font-semibold cursor-pointer hover:underline">
-                개인정보처리방침
-              </span>
-              에 동의합니다
-            </span>
-          </div>
         </div>
 
         <button
           onClick={handleSubmit}
-          className={`w-full h-12 font-bold rounded-lg transition-colors text-white ${
-            agreed
-              ? "bg-[#007aff] hover:bg-[#004f91]"
-              : "bg-gray-300 cursor-not-allowed"
-          }`}
+          className="w-full h-12 font-bold rounded-lg transition-colors text-white bg-[#007aff] hover:bg-[#004f91]"
         >
           회원가입
         </button>
