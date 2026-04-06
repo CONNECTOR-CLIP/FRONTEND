@@ -22,7 +22,7 @@ function SignupCompletePage() {
           </svg>
         </div>
 
-        <div className="flex flex-col items-center gap-3 text-center">
+        <div className="flex flex-col items-center gap-2 text-center">
           <p className="text-xl font-bold leading-snug">
             {nickname} 님의 회원가입이
             <br />
