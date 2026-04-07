@@ -26,8 +26,9 @@ function LandingPage() {
         </div>
         <div className="flex gap-[24px]">
           <div className="border-[#e5e7eb]-0 bg-linear-to-r from-[#3b82f6] to-[#2563eb] w-[236px] h-[68px] flex items-center justify-center rounded-[12px] text-white">
-            <button onClick={() => navigate("/home")}></button>
-            흐름 정리해보기 -{">"}
+            <button onClick={() => navigate("/home")}>
+              흐름 정리해보기 -{">"}
+            </button>
           </div>
           <div className="border w-[218px] h-[68px] flex items-center justify-center rounded-[12px]">
             <button onClick={() => navigate("/Demo")}>Watch Demo</button>
