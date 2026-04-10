@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import AlertModal from "./AlertModal";
 
 function ContentNavbar() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [showLogin, setShowLogin] = useState(false);
   const [showalert, setShowalert] = useState(false);
   const hasAlert = true; // 알림 존재 여부 (추후 실제 데이터로 교체)
@@ -30,29 +31,31 @@ function ContentNavbar() {
           </div>
           <div
             id="nav-contents"
-            className="flex items-center gap-[32px] text-[#64748B]"
+            className="flex items-center gap-8 text-[#64748B]"
           >
-            <button
-              onClick={() => navigate("/Features")}
-              className="text-sm hover:text-black cursor-pointer"
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => navigate("/Research")}
-              className="text-sm hover:text-black cursor-pointer"
-            >
-              검색하기
-            </button>
-            <button
-              onClick={() => navigate("/Documentation")}
-              className="text-sm hover:text-black cursor-pointer"
-            >
-              검색기록
-            </button>
+            {[
+              { label: "Dashboard", path: "/home" },
+              { label: "검색하기", path: "/Research" },
+              { label: "검색기록", path: "/Documentation" },
+            ].map(({ label, path }) => {
+              const active = pathname === path;
+              return (
+                <button
+                  key={path}
+                  onClick={() => navigate(path)}
+                  className={`text-sm cursor-pointer border-b-2 pb-0.5 transition-colors ${
+                    active
+                      ? "text-[#1d4ed8] border-[#1d4ed8]"
+                      : "text-[#64748B] border-transparent hover:text-black"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
             <button
               onClick={() => setShowLogin(true)}
-              className="text-[16px] text-[#64748B] hover:text-black cursor-pointer"
+              className={`text-sm cursor-pointer border-b-2 pb-0.5 transition-colors border-transparent text-[#64748B] hover:text-black`}
             >
               Network
             </button>
@@ -112,7 +115,9 @@ function ContentNavbar() {
                 />
               </svg>
             </button>
-            <button onClick={() => setShowmyprofile(true)}>myprofile</button>
+            <button id="profile" onClick={() => setShowmyprofile(true)}>
+              마이프로필
+            </button>
           </div>
         </div>
       </nav>
