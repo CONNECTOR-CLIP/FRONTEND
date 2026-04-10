@@ -3,7 +3,7 @@ import ContentNavbar from "@/components/ContentNavbar";
 
 function MainLayout() {
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    <div className="min-h-screen relative overflow-hidden">
       {/* bg blur orbs */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute -top-10 -left-20 w-[500px] h-[500px] rounded-full bg-[#bfdbfe] opacity-50 blur-[30px]" />
