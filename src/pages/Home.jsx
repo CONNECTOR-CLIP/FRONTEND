@@ -1,3 +1,6 @@
+import { useRef, useLayoutEffect, useState } from "react";
+import { prepareWithSegments, layoutWithLines } from "@chenglou/pretext";
+
 /* ─── 목데이터 ─── */
 const trendingKeywords = [
   { rank: 1, label: "Transformer Architecture" },
@@ -6,7 +9,7 @@ const trendingKeywords = [
 ];
 
 const myStatus = [
-  { label: "편을 읽으셨어요", value: 127 },
+  { label: "편을 읽으셨어요", firstvalue: 127 },
   { label: "편을 저장했어요", value: 43 },
   { label: "개의 키워드를 검색했어요", value: 89 },
   { label: "개의 키워드를 확인했어요", value: 12 },
@@ -23,7 +26,7 @@ const recentActivities = [
     text: "Saved 'BERT Explained' to Roadmap",
     time: "5 hours ago",
   },
-  { icon: "share", text: "Shared 'ML Basics' with Network", time: "Yesterday" },
+  { icon: "save", text: "Shared 'ML Basics' with Network", time: "Yesterday" },
 ];
 
 const recentPapers = [
@@ -38,19 +41,19 @@ const recentPapers = [
     tags: ["DEEP LEARNING"],
     title: "Deep Reinforcement Learning in Robotics",
     desc: "An in-depth analysis of policy gradient methods applied to real-world robotic manipulator control...",
-    author: null,
+    author: "저자",
     date: "Oct 10, 2023",
   },
   {
     tags: ["NLP", "LLM"],
     title: "Large Language Models: A Comprehensive Survey",
     desc: "Tracing the development of generative pre-trained models from GPT-1 to the current state-o...",
-    author: null,
+    author: "저자",
     date: "Sep 28, 2023",
   },
 ];
 
-/* ─── Roadmap SVG Mind-Map ─── */
+/* ─── 마인드맵 목데이터 ─── */
 function RoadmapGraph() {
   const cx = 440,
     cy = 240;
@@ -220,23 +223,117 @@ const tagColor = (tag) => {
   return map[tag] ?? "bg-gray-100 text-gray-600";
 };
 
+/* ─── Paper Card ─── */
+function PaperCard({ paper }) {
+  const titleRef = useRef(null);
+  const [descMaxWidth, setDescMaxWidth] = useState(null);
+
+  useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    const style = window.getComputedStyle(el);
+    const font = style.font;
+    const lineHeight = parseFloat(style.lineHeight) || 20;
+    const prepared = prepareWithSegments(paper.title, font);
+    // 9999px: 줄바꿈 없이 한 줄로 펼쳤을 때의 자연 너비 측정
+    const { lines } = layoutWithLines(prepared, 9999, lineHeight);
+    const naturalWidth = lines[0]?.width ?? null;
+    if (naturalWidth != null) setDescMaxWidth(naturalWidth);
+  }, [paper.title]);
+
+  return (
+    <div className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm p-5 flex flex-col gap-[16px] hover:shadow-md transition-shadow cursor-pointer">
+      {/* tags */}
+      <div className="flex flex-wrap gap-1.5 mt-[32px]">
+        {paper.tags.map((tag) => (
+          <span
+            key={tag}
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tagColor(tag)}`}
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+      {/* title + desc — desc는 제목의 자연 너비에 맞춰 줄바꿈 */}
+      <div
+        style={descMaxWidth != null ? { maxWidth: descMaxWidth } : undefined}
+      >
+        <h3
+          ref={titleRef}
+          className="text-sm font-bold text-[#1E293B] leading-snug mb-1"
+        >
+          {paper.title}
+        </h3>
+        <p className="text-xs text-[#94A3B8] leading-relaxed break-words">
+          {paper.desc}
+        </p>
+      </div>
+      {/* footer */}
+      <div className="mt-auto flex items-center justify-between pt-3 border-t border-[#F1F5F9] text-xs text-[#94A3B8]">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <svg
+            className="w-4 h-4 shrink-0"
+            fill="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+          </svg>
+          <span className="truncate">{paper.author ?? "—"}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <svg
+            className="w-3.5 h-3.5 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
+          </svg>
+          <span>{paper.date}</span>
+          <button className="w-8 h-8 rounded-full bg-[#EEF2FF] flex items-center justify-center text-[#6366F1] hover:bg-[#E0E7FF] transition-colors shrink-0">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Home Page ─── */
 function Home() {
   return (
-    <div className="mx-auto max-w-7xl px-8 py-8">
+    <div className="mx-auto max-w-screen-3xl px-8 py-8 flex flex-col gap-6">
+      {/* ── 상단: 타이틀 + 로드맵(좌) / 사이드바(우) ── */}
       <div className="flex gap-6">
-        {/* ── Left Column ── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-6">
+        {/* Left: 타이틀 + 로드맵 */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
           {/* Title */}
           <div>
             <h1 className="text-lg font-bold text-[#173355]">CLIP Dashboard</h1>
-            <p className="mt-1 text-regular  text-[#466084]">
+            <p className="mt-1 text-regular text-[#466084]">
               돌아오셔서 기뻐요. 여기 마지막으로 탐색하신 로드맵이에요.
             </p>
           </div>
 
-          {/* 최신로드맵 */}
-          <div className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden">
+          {/* 최근로드맵 */}
+          <div className="h-[779px] rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden">
             {/* card header */}
             <div className="flex items-center gap-2 px-6 pt-5 pb-2">
               <svg
@@ -259,14 +356,13 @@ function Home() {
             </div>
 
             {/* graph area */}
-            <div className="h-80 bg-[#F8FAFC] mx-4 rounded-xl overflow-hidden">
+            <div className="h-160 bg-white mx-4 rounded-xl overflow-hidden">
               <RoadmapGraph />
             </div>
 
             {/* expand button */}
             <div className="flex justify-end items-center gap-2 px-6 py-4">
               <div className="flex gap-1.5 ml-1">
-                {/* zoom-in: 돋보기 + 플러스 */}
                 <button
                   id="zoom-in"
                   className="rounded-full w-6 h-6 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
@@ -304,7 +400,6 @@ function Home() {
                     />
                   </svg>
                 </button>
-                {/* zoom-out: 돋보기 + 마이너스 */}
                 <button
                   id="zoom-out"
                   className="rounded-full w-6 h-6 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
@@ -334,7 +429,6 @@ function Home() {
                     />
                   </svg>
                 </button>
-                {/* expand: 전체화면 아이콘 */}
                 <button
                   id="expand"
                   className="rounded-full w-6 h-6 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
@@ -355,130 +449,18 @@ function Home() {
               </div>
             </div>
           </div>
-
-          {/* Recent Papers */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-[#1E293B]">
-                최근 본 논문
-              </h2>
-              <button className="text-sm text-[#6366F1] hover:underline">
-                View all archive →
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              {recentPapers.map((paper, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition-shadow cursor-pointer"
-                >
-                  {/* tags */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {paper.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${tagColor(tag)}`}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  {/* title + desc */}
-                  <div>
-                    <h3 className="text-sm font-bold text-[#1E293B] leading-snug mb-1">
-                      {paper.title}
-                    </h3>
-                    <p className="text-xs text-[#94A3B8] leading-relaxed line-clamp-2">
-                      {paper.desc}
-                    </p>
-                  </div>
-                  {/* footer */}
-                  <div className="mt-auto flex items-center justify-between pt-2 border-t border-[#F1F5F9]">
-                    <div className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
-                      {paper.author ? (
-                        <>
-                          <div className="w-4 h-4 rounded-full bg-[#E2E8F0] flex items-center justify-center">
-                            <svg
-                              className="w-3 h-3 text-[#94A3B8]"
-                              fill="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
-                            </svg>
-                          </div>
-                          {paper.author}
-                        </>
-                      ) : (
-                        <span className="flex items-center gap-1">
-                          <svg
-                            className="w-3.5 h-3.5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                          {paper.date}
-                        </span>
-                      )}
-                    </div>
-                    <button className="w-7 h-7 rounded-lg border border-[#E2E8F0] flex items-center justify-center text-[#94A3B8] hover:bg-gray-50">
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                  {paper.author && (
-                    <div className="flex items-center justify-between text-xs text-[#94A3B8] -mt-1">
-                      <span className="flex items-center gap-1">
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                        {paper.date}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* ── Right Sidebar ── */}
-        <div className="w-60 shrink-0 flex flex-col gap-5">
+        <div className="w-[400px] shrink-0 flex flex-col gap-[32px]">
           {/* Trending Keywords */}
-          <div className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm p-5">
+          <div className="rounded-2xl border border-[#E2E8F0] bg-[#EFF3FF] shadow-sm p-[32px]">
             <div className="flex items-center justify-between mb-4">
               <span className="font-semibold text-[#1E293B] text-sm">
                 트렌딩 중인 키워드
               </span>
               <svg
-                className="w-4 h-4 text-[#94A3B8]"
+                className="w-4 h-4 text-[#1e6ad4]"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -491,11 +473,12 @@ function Home() {
                 />
               </svg>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
               {trendingKeywords.map((kw) => (
                 <div
+                  id="rank-button"
                   key={kw.rank}
-                  className="flex items-center gap-3 rounded-xl border border-[#F1F5F9] px-3 py-2.5 hover:bg-[#F8FAFC] cursor-pointer transition-colors"
+                  className="flex items-center bg-white gap-3 rounded-xl border border-[#F1F5F9] px-3 py-2.5 hover:bg-[#F8FAFC] cursor-pointer transition-colors"
                 >
                   <span className="w-5 h-5 rounded-full bg-[#F1F5F9] flex items-center justify-center text-[11px] font-bold text-[#64748B]">
                     {kw.rank}
@@ -509,7 +492,7 @@ function Home() {
           </div>
 
           {/* My Status */}
-          <div className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm p-5">
+          <div className="rounded-2xl border border-[#E2E8F0] bg-[#EFF3FF] shadow-sm p-5">
             <div className="flex items-center gap-1.5 mb-4">
               <span className="font-semibold text-[#1E293B] text-sm">
                 내 현황
@@ -520,35 +503,26 @@ function Home() {
               {myStatus.map((s, i) => (
                 <div
                   key={i}
-                  className="rounded-xl bg-[#F8FAFC] p-3 flex flex-col gap-1"
+                  className="rounded-xl bg-[#F8FAFC] p-3 flex flex-col gap-1 h-[100px]"
                 >
                   <p className="text-[10px] text-[#94A3B8] leading-tight">
                     {s.label}
                   </p>
-                  <p className="text-xl font-bold text-[#1E293B]">{s.value}</p>
+                  <p className="text-xl font-bold text-[#0060AD]">
+                    {s.firstvalue}
+                  </p>
+                  <p className="text-xl font-bold text-[#173355]">{s.value}</p>
                 </div>
               ))}
-              {/* profile badge */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-12 h-12 rounded-full bg-[#E2E8F0] border-2 border-white shadow-md flex items-center justify-center">
-                  <svg
-                    className="w-7 h-7 text-[#94A3B8]"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
-                  </svg>
-                </div>
-              </div>
             </div>
           </div>
 
           {/* Recent Activities */}
-          <div className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm p-5">
+          <div className="rounded-2xl border border-[#E2E8F0] bg-[#EFF3FF] shadow-sm p-8">
             <h3 className="font-semibold text-[#1E293B] text-sm mb-4">
               최근 활동
             </h3>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-[24px]">
               {recentActivities.map((act, i) => (
                 <div key={i} className="flex items-start gap-2.5">
                   <ActivityIcon type={act.icon} />
@@ -564,6 +538,20 @@ function Home() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+      {/* ── 하단: 최근 본 논문 (전체 너비) ── */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-[#1E293B]">최근 본 논문</h2>
+          <button className="text-sm text-[#6366F1] hover:underline">
+            View all archive →
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          {recentPapers.map((paper, idx) => (
+            <PaperCard key={idx} paper={paper} />
+          ))}
         </div>
       </div>
     </div>
