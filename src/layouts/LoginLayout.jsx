@@ -42,7 +42,7 @@ const orbs = [
 
 function LoginLayout() {
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden min-w-[900px]">
       <style>{`
         @keyframes orb-float {
           0%   { transform: translate(0px, 0px)    scale(1);    }
