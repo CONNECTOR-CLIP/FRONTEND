@@ -505,13 +505,19 @@ function Home() {
                   key={i}
                   className="rounded-xl bg-[#F8FAFC] p-3 flex flex-col gap-1 h-[100px]"
                 >
-                  <p className="text-[10px] text-[#94A3B8] leading-tight">
+                  <p className="text-[12px] text-[#94A3B8] leading-tight">
                     {s.label}
                   </p>
-                  <p className="text-xl font-bold text-[#0060AD]">
-                    {s.firstvalue}
-                  </p>
-                  <p className="text-xl font-bold text-[#173355]">{s.value}</p>
+                  {s.firstvalue != null && (
+                    <p className="text-[30px] font-bold text-[#0060AD]">
+                      {s.firstvalue}
+                    </p>
+                  )}
+                  {s.value != null && (
+                    <p className="text-[30px] font-bold text-[#173355]">
+                      {s.value}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
