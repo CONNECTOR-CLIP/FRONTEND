@@ -175,9 +175,9 @@ function ActivityIcon({ type }) {
     "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0";
   if (type === "analyze")
     return (
-      <div className={`${base} bg-[#EFF6FF]`}>
+      <div className={`${base} bg-[#0060AD]`}>
         <svg
-          className="w-4 h-4 text-[#3B82F6]"
+          className="w-4 h-4 text-white"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -193,9 +193,9 @@ function ActivityIcon({ type }) {
     );
   if (type === "save")
     return (
-      <div className={`${base} bg-[#F5F3FF]`}>
+      <div className={`${base} bg-[#7C3AED]`}>
         <svg
-          className="w-4 h-4 text-[#7C3AED]"
+          className="w-4 h-4 text-white"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
