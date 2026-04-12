@@ -212,7 +212,7 @@ function ActivityIcon({ type }) {
 }
 
 /* ─── Tag Colors ─── */
-const tagColor = (tag) => {
+/*const tagColor = (tag) => {
   const map = {
     AI: "bg-blue-100 text-blue-700",
     ML: "bg-purple-100 text-purple-700",
@@ -221,7 +221,7 @@ const tagColor = (tag) => {
     LLM: "bg-orange-100 text-orange-700",
   };
   return map[tag] ?? "bg-gray-100 text-gray-600";
-};
+};*/
 
 /* ─── Paper Card ─── */
 function PaperCard({ paper }) {
