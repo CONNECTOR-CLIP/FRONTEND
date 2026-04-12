@@ -12,7 +12,7 @@ const myStatus = [
   { label: "편을 읽으셨어요", firstvalue: 127 },
   { label: "편을 저장했어요", value: 43 },
   { label: "개의 키워드를 검색했어요", value: 89 },
-  { label: "개의 키워드를 확인했어요", value: 12 },
+  { label: "최근에 많이 스크랩한 키워드", value: "AI" },
 ];
 
 const recentActivities = [
