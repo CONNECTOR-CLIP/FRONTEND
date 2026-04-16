@@ -212,7 +212,7 @@ function ActivityIcon({ type }) {
 }
 
 /* ─── Tag Colors ─── */
-/*const tagColor = (tag) => {
+const tagColor = (tag) => {
   const map = {
     AI: "bg-blue-100 text-blue-700",
     ML: "bg-purple-100 text-purple-700",
@@ -221,7 +221,7 @@ function ActivityIcon({ type }) {
     LLM: "bg-orange-100 text-orange-700",
   };
   return map[tag] ?? "bg-gray-100 text-gray-600";
-};*/
+};
 
 /* ─── Paper Card ─── */
 function PaperCard({ paper }) {
@@ -244,16 +244,7 @@ function PaperCard({ paper }) {
   return (
     <div className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm p-5 flex flex-col gap-[16px] hover:shadow-md transition-shadow cursor-pointer">
       {/* tags */}
-      <div className="flex flex-wrap gap-1.5 mt-[32px]">
-        {paper.tags.map((tag) => (
-          <span
-            key={tag}
-            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tagColor(tag)}`}
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
+      <div className="flex flex-wrap gap-1.5 mt-[32px]"></div>
       {/* title + desc — desc는 제목의 자연 너비에 맞춰 줄바꿈 */}
       <div
         style={descMaxWidth != null ? { maxWidth: descMaxWidth } : undefined}

@@ -9,6 +9,7 @@ function MainLayout() {
         <div className="absolute -top-10 -left-20 w-[500px] h-[500px] rounded-full bg-[#bfdbfe] opacity-50 blur-[30px]" />
         <div className="absolute top-80 right-0 w-[450px] h-[450px] rounded-full bg-[#ddd6fe] opacity-40 blur-[30px]" />
       </div>
+
       <ContentNavbar />
       <Outlet />
     </div>
