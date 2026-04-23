@@ -1,4 +1,5 @@
 import { useRef, useLayoutEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { prepareWithSegments, layoutWithLines } from "@chenglou/pretext";
 
 /* ─── 목데이터 ─── */
@@ -309,6 +310,7 @@ function PaperCard({ paper }) {
 
 /* ─── Home Page ─── */
 function Home() {
+  const navigate = useNavigate();
   return (
     <div className="mx-auto max-w-screen-3xl px-8 py-8 flex flex-col gap-6">
       {/* ── 상단: 타이틀 + 로드맵(좌) / 사이드바(우) ── */}
@@ -422,6 +424,7 @@ function Home() {
                 </button>
                 <button
                   id="expand"
+                  onClick={() => navigate("/roadmap")}
                   className="rounded-full w-6 h-6 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
                 >
                   <svg
