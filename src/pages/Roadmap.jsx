@@ -25,19 +25,55 @@ const SAMPLE_DATA = {
           label: "Language Model",
           cfo: {
             label_id: "language model",
-            initial_keywords: ["language model@en .", "language modeling@en .", "language models@en .", "n-gram language models@en .", "statistical language models@en ."],
+            initial_keywords: [
+              "language model@en .",
+              "language modeling@en .",
+              "language models@en .",
+              "n-gram language models@en .",
+              "statistical language models@en .",
+            ],
           },
           children: [
-            { paper_id: "2412.03884", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2503.18018", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2505.02781", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2505.07315", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2505.13126", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2508.15358", assignment: { score: 0.1, was_reexpressed: false } },
-            { paper_id: "2512.08296", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2602.03249", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2604.02022", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2604.05297", assignment: { score: 1.0, was_reexpressed: false } },
+            {
+              paper_id: "2412.03884",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2503.18018",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2505.02781",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2505.07315",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2505.13126",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2508.15358",
+              assignment: { score: 0.1, was_reexpressed: false },
+            },
+            {
+              paper_id: "2512.08296",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2602.03249",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2604.02022",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2604.05297",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
           ],
         },
         {
@@ -45,13 +81,30 @@ const SAMPLE_DATA = {
           label: "Transformer",
           cfo: {
             label_id: "transformer",
-            initial_keywords: ["transformer@en .", "attention mechanism@en .", "self-attention@en .", "multi-head attention@en ."],
+            initial_keywords: [
+              "transformer@en .",
+              "attention mechanism@en .",
+              "self-attention@en .",
+              "multi-head attention@en .",
+            ],
           },
           children: [
-            { paper_id: "2301.00234", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2302.05442", assignment: { score: 0.9, was_reexpressed: false } },
-            { paper_id: "2303.12980", assignment: { score: 0.8, was_reexpressed: false } },
-            { paper_id: "2304.01373", assignment: { score: 1.0, was_reexpressed: false } },
+            {
+              paper_id: "2301.00234",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2302.05442",
+              assignment: { score: 0.9, was_reexpressed: false },
+            },
+            {
+              paper_id: "2303.12980",
+              assignment: { score: 0.8, was_reexpressed: false },
+            },
+            {
+              paper_id: "2304.01373",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
           ],
         },
         {
@@ -59,13 +112,29 @@ const SAMPLE_DATA = {
           label: "Deep Learning",
           cfo: {
             label_id: "deep learning",
-            initial_keywords: ["deep learning@en .", "deep neural network@en .", "convolutional neural network@en ."],
+            initial_keywords: [
+              "deep learning@en .",
+              "deep neural network@en .",
+              "convolutional neural network@en .",
+            ],
           },
           children: [
-            { paper_id: "2401.10011", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2402.10022", assignment: { score: 0.9, was_reexpressed: false } },
-            { paper_id: "2403.10033", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2404.10044", assignment: { score: 0.7, was_reexpressed: true } },
+            {
+              paper_id: "2401.10011",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2402.10022",
+              assignment: { score: 0.9, was_reexpressed: false },
+            },
+            {
+              paper_id: "2403.10033",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2404.10044",
+              assignment: { score: 0.7, was_reexpressed: true },
+            },
           ],
         },
         {
@@ -73,12 +142,25 @@ const SAMPLE_DATA = {
           label: "Policy Gradient",
           cfo: {
             label_id: "policy gradient",
-            initial_keywords: ["policy gradient@en .", "reinforcement learning@en .", "reward function@en ."],
+            initial_keywords: [
+              "policy gradient@en .",
+              "reinforcement learning@en .",
+              "reward function@en .",
+            ],
           },
           children: [
-            { paper_id: "2401.20011", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2402.20022", assignment: { score: 0.8, was_reexpressed: false } },
-            { paper_id: "2405.20033", assignment: { score: 0.6, was_reexpressed: true } },
+            {
+              paper_id: "2401.20011",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2402.20022",
+              assignment: { score: 0.8, was_reexpressed: false },
+            },
+            {
+              paper_id: "2405.20033",
+              assignment: { score: 0.6, was_reexpressed: true },
+            },
           ],
         },
         {
@@ -86,14 +168,34 @@ const SAMPLE_DATA = {
           label: "Object Detection",
           cfo: {
             label_id: "object detection",
-            initial_keywords: ["object detection@en .", "YOLO@en .", "bounding box@en .", "anchor-based detection@en ."],
+            initial_keywords: [
+              "object detection@en .",
+              "YOLO@en .",
+              "bounding box@en .",
+              "anchor-based detection@en .",
+            ],
           },
           children: [
-            { paper_id: "2401.30011", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2402.30022", assignment: { score: 0.9, was_reexpressed: false } },
-            { paper_id: "2403.30033", assignment: { score: 0.7, was_reexpressed: false } },
-            { paper_id: "2404.30044", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2501.30055", assignment: { score: 0.8, was_reexpressed: false } },
+            {
+              paper_id: "2401.30011",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2402.30022",
+              assignment: { score: 0.9, was_reexpressed: false },
+            },
+            {
+              paper_id: "2403.30033",
+              assignment: { score: 0.7, was_reexpressed: false },
+            },
+            {
+              paper_id: "2404.30044",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2501.30055",
+              assignment: { score: 0.8, was_reexpressed: false },
+            },
           ],
         },
         {
@@ -101,12 +203,25 @@ const SAMPLE_DATA = {
           label: "Image Generation",
           cfo: {
             label_id: "image generation",
-            initial_keywords: ["image generation@en .", "diffusion model@en .", "generative adversarial network@en ."],
+            initial_keywords: [
+              "image generation@en .",
+              "diffusion model@en .",
+              "generative adversarial network@en .",
+            ],
           },
           children: [
-            { paper_id: "2401.40011", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2402.40022", assignment: { score: 0.8, was_reexpressed: false } },
-            { paper_id: "2503.40033", assignment: { score: 1.0, was_reexpressed: false } },
+            {
+              paper_id: "2401.40011",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2402.40022",
+              assignment: { score: 0.8, was_reexpressed: false },
+            },
+            {
+              paper_id: "2503.40033",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
           ],
         },
         {
@@ -114,12 +229,25 @@ const SAMPLE_DATA = {
           label: "Text Classification",
           cfo: {
             label_id: "text classification",
-            initial_keywords: ["text classification@en .", "sentiment analysis@en .", "document classification@en ."],
+            initial_keywords: [
+              "text classification@en .",
+              "sentiment analysis@en .",
+              "document classification@en .",
+            ],
           },
           children: [
-            { paper_id: "2401.50011", assignment: { score: 0.9, was_reexpressed: false } },
-            { paper_id: "2402.50022", assignment: { score: 0.7, was_reexpressed: false } },
-            { paper_id: "2403.50033", assignment: { score: 1.0, was_reexpressed: false } },
+            {
+              paper_id: "2401.50011",
+              assignment: { score: 0.9, was_reexpressed: false },
+            },
+            {
+              paper_id: "2402.50022",
+              assignment: { score: 0.7, was_reexpressed: false },
+            },
+            {
+              paper_id: "2403.50033",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
           ],
         },
         {
@@ -127,11 +255,21 @@ const SAMPLE_DATA = {
           label: "Machine Translation",
           cfo: {
             label_id: "machine translation",
-            initial_keywords: ["machine translation@en .", "neural machine translation@en .", "sequence to sequence@en ."],
+            initial_keywords: [
+              "machine translation@en .",
+              "neural machine translation@en .",
+              "sequence to sequence@en .",
+            ],
           },
           children: [
-            { paper_id: "2401.60011", assignment: { score: 1.0, was_reexpressed: false } },
-            { paper_id: "2402.60022", assignment: { score: 0.8, was_reexpressed: false } },
+            {
+              paper_id: "2401.60011",
+              assignment: { score: 1.0, was_reexpressed: false },
+            },
+            {
+              paper_id: "2402.60022",
+              assignment: { score: 0.8, was_reexpressed: false },
+            },
           ],
         },
       ],
@@ -170,25 +308,37 @@ const SPREAD_ANGLE = Math.PI * 1.2; // 216° 부채꼴
 /* ─── 엣지 방향 결정 (최적 handle 선택) ─── */
 function getHandleDir(fromX, fromY, toX, toY) {
   const a = (Math.atan2(toY - fromY, toX - fromX) * 180) / Math.PI;
-  if (a > -45 && a <= 45)   return { src: "right",  tgt: "left"   };
-  if (a > 45  && a <= 135)  return { src: "bottom", tgt: "top"    };
-  if (a > 135 || a <= -135) return { src: "left",   tgt: "right"  };
-  return                           { src: "top",    tgt: "bottom" };
+  if (a > -45 && a <= 45) return { src: "right", tgt: "left" };
+  if (a > 45 && a <= 135) return { src: "bottom", tgt: "top" };
+  if (a > 135 || a <= -135) return { src: "left", tgt: "right" };
+  return { src: "top", tgt: "bottom" };
 }
 
 /* ─── 전방향 Handle (모든 노드 공용) ─── */
 const ALL_DIRS = [
-  { pos: Position.Top,    dir: "top"    },
+  { pos: Position.Top, dir: "top" },
   { pos: Position.Bottom, dir: "bottom" },
-  { pos: Position.Left,   dir: "left"   },
-  { pos: Position.Right,  dir: "right"  },
+  { pos: Position.Left, dir: "left" },
+  { pos: Position.Right, dir: "right" },
 ];
 
 function AllHandles() {
   return ALL_DIRS.map(({ pos, dir }) => (
     <React.Fragment key={dir}>
-      <Handle type="source" position={pos} id={`src-${dir}`} style={{ opacity: 0 }} isConnectable={false} />
-      <Handle type="target" position={pos} id={`tgt-${dir}`} style={{ opacity: 0 }} isConnectable={false} />
+      <Handle
+        type="source"
+        position={pos}
+        id={`src-${dir}`}
+        style={{ opacity: 0 }}
+        isConnectable={false}
+      />
+      <Handle
+        type="target"
+        position={pos}
+        id={`tgt-${dir}`}
+        style={{ opacity: 0 }}
+        isConnectable={false}
+      />
     </React.Fragment>
   ));
 }
@@ -205,7 +355,9 @@ function RootNode({ data }) {
         {data.label.split(".")[0]}
         <br />.{data.label.split(".")[1] ?? ""}
       </span>
-      <span className="text-[#BFD0FF] text-[9px] tracking-widest mt-1">ROOT</span>
+      <span className="text-[#BFD0FF] text-[9px] tracking-widest mt-1">
+        ROOT
+      </span>
     </div>
   );
 }
@@ -215,9 +367,10 @@ function TopicNode({ data }) {
     <div
       style={{ width: TOPIC_W, height: TOPIC_H }}
       className={`relative flex items-center justify-center rounded-full cursor-pointer transition-colors select-none
-        ${data.isExpanded
-          ? "bg-[#4338CA] shadow-lg shadow-indigo-500/30"
-          : "bg-[#1E293B] hover:bg-[#334155]"
+        ${
+          data.isExpanded
+            ? "bg-[#4338CA] shadow-lg shadow-indigo-500/30"
+            : "bg-[#1E293B] hover:bg-[#334155]"
         }`}
     >
       <AllHandles />
@@ -239,9 +392,11 @@ function TopicNode({ data }) {
 function PaperNode({ data }) {
   const score = data.score ?? 0;
   const scoreStyle =
-    score >= 0.8 ? "text-emerald-600 bg-emerald-50 border-emerald-200"
-    : score >= 0.5 ? "text-amber-600 bg-amber-50 border-amber-200"
-    : "text-red-600 bg-red-50 border-red-200";
+    score >= 0.8
+      ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+      : score >= 0.5
+        ? "text-amber-600 bg-amber-50 border-amber-200"
+        : "text-red-600 bg-red-50 border-red-200";
 
   return (
     <a
@@ -256,7 +411,9 @@ function PaperNode({ data }) {
         arXiv:{data.paperId}
       </p>
       <div className="flex items-center gap-1.5 mt-1">
-        <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${scoreStyle}`}>
+        <span
+          className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${scoreStyle}`}
+        >
           {score.toFixed(1)}
         </span>
         {data.wasReexpressed && (
@@ -267,21 +424,27 @@ function PaperNode({ data }) {
   );
 }
 
-const nodeTypes = { rootNode: RootNode, topicNode: TopicNode, paperNode: PaperNode };
+const nodeTypes = {
+  rootNode: RootNode,
+  topicNode: TopicNode,
+  paperNode: PaperNode,
+};
 
 /* ─── 초기 그래프 빌드 (root + 방사형 topic) ─── */
 function buildInitialGraph(root) {
   const n = root.topics.length;
   const topicAngles = {};
 
-  const nodes = [{
-    id: root.id,
-    type: "rootNode",
-    position: { x: -ROOT_W / 2, y: -ROOT_H / 2 },
-    data: { label: root.label },
-    selectable: false,
-    draggable: false,
-  }];
+  const nodes = [
+    {
+      id: root.id,
+      type: "rootNode",
+      position: { x: -ROOT_W / 2, y: -ROOT_H / 2 },
+      data: { label: root.label },
+      selectable: false,
+      draggable: false,
+    },
+  ];
 
   const edges = [];
 
@@ -295,7 +458,11 @@ function buildInitialGraph(root) {
       id: topic.id,
       type: "topicNode",
       position: { x: tx - TOPIC_W / 2, y: ty - TOPIC_H / 2 },
-      data: { label: topic.label, paperCount: topic.papers.length, isExpanded: false },
+      data: {
+        label: topic.label,
+        paperCount: topic.papers.length,
+        isExpanded: false,
+      },
     });
 
     const { src, tgt } = getHandleDir(0, 0, tx, ty);
@@ -364,10 +531,11 @@ function RoadmapFlow({ root, roots }) {
   const { fitView } = useReactFlow();
   const [expandedId, setExpandedId] = useState(null);
 
-  const { nodes: initNodes, edges: initEdges, topicAngles } = useMemo(
-    () => buildInitialGraph(root),
-    [root]
-  );
+  const {
+    nodes: initNodes,
+    edges: initEdges,
+    topicAngles,
+  } = useMemo(() => buildInitialGraph(root), [root]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
@@ -379,7 +547,9 @@ function RoadmapFlow({ root, roots }) {
 
   // expandedId 변경 → 노드/엣지 동기화
   useEffect(() => {
-    const topic = expandedId ? root.topics.find((t) => t.id === expandedId) : null;
+    const topic = expandedId
+      ? root.topics.find((t) => t.id === expandedId)
+      : null;
     const expansion = topic
       ? buildExpansion(topic, topicAngles[expandedId])
       : { nodes: [], edges: [] };
@@ -390,7 +560,7 @@ function RoadmapFlow({ root, roots }) {
         .map((n) =>
           n.type === "topicNode"
             ? { ...n, data: { ...n.data, isExpanded: n.id === expandedId } }
-            : n
+            : n,
         ),
       ...expansion.nodes,
     ]);
@@ -412,9 +582,14 @@ function RoadmapFlow({ root, roots }) {
 
   // 펼쳐진 topic 영역으로 카메라 포커스
   useEffect(() => {
-    const topic = expandedId ? root.topics.find((t) => t.id === expandedId) : null;
+    const topic = expandedId
+      ? root.topics.find((t) => t.id === expandedId)
+      : null;
     const nodeIds = topic
-      ? [{ id: expandedId }, ...topic.papers.map((p) => ({ id: `paper-${p.paper_id}` }))]
+      ? [
+          { id: expandedId },
+          ...topic.papers.map((p) => ({ id: `paper-${p.paper_id}` })),
+        ]
       : undefined;
 
     const timer = setTimeout(() => {
@@ -440,20 +615,27 @@ function RoadmapFlow({ root, roots }) {
         <div className="flex items-center gap-2 bg-white rounded-xl border border-[#E2E8F0] px-4 py-2 shadow-sm">
           <div className="w-2 h-2 rounded-full bg-[#3B5BDB]" />
           <span className="text-xs font-medium text-[#334155]">카테고리</span>
-          <span className="text-xs font-bold text-[#3B5BDB]">{roots.length}</span>
+          <span className="text-xs font-bold text-[#3B5BDB]">
+            {roots.length}
+          </span>
         </div>
         <div className="flex items-center gap-2 bg-white rounded-xl border border-[#E2E8F0] px-4 py-2 shadow-sm">
           <div className="w-2 h-2 rounded-full bg-[#6366F1]" />
           <span className="text-xs font-medium text-[#334155]">토픽 노드</span>
-          <span className="text-xs font-bold text-[#6366F1]">{root.topics.length}</span>
+          <span className="text-xs font-bold text-[#6366F1]">
+            {root.topics.length}
+          </span>
         </div>
         <div className="flex items-center gap-2 bg-white rounded-xl border border-[#E2E8F0] px-4 py-2 shadow-sm">
           <div className="w-2 h-2 rounded-full bg-emerald-500" />
           <span className="text-xs font-medium text-[#334155]">총 논문</span>
-          <span className="text-xs font-bold text-emerald-600">{totalPapers}</span>
+          <span className="text-xs font-bold text-emerald-600">
+            {totalPapers}
+          </span>
         </div>
         <span className="text-xs text-[#94A3B8] ml-auto">
-          생성일: {new Date(SAMPLE_DATA.generated_at).toLocaleDateString("ko-KR")}
+          생성일:{" "}
+          {new Date(SAMPLE_DATA.generated_at).toLocaleDateString("ko-KR")}
         </span>
       </div>
 
@@ -464,12 +646,26 @@ function RoadmapFlow({ root, roots }) {
       >
         <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#F1F5F9]">
           <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-[#6366F1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            <svg
+              className="w-4 h-4 text-[#6366F1]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
             </svg>
-            <span className="font-semibold text-[#1E293B] text-sm">연구 로드맵</span>
+            <span className="font-semibold text-[#1E293B] text-sm">
+              연구 로드맵
+            </span>
           </div>
-          <span className="text-xs text-[#94A3B8]">토픽 노드를 클릭하여 논문을 펼쳐보세요</span>
+          <span className="text-xs text-[#94A3B8]">
+            토픽 노드를 클릭하여 논문을 펼쳐보세요
+          </span>
         </div>
         <div style={{ height: "calc(100% - 57px)" }}>
           <ReactFlow
@@ -493,6 +689,7 @@ function RoadmapFlow({ root, roots }) {
     </div>
   );
 }
+/*jira test*/
 
 /* ─── Roadmap Page ─── */
 function Roadmap() {
