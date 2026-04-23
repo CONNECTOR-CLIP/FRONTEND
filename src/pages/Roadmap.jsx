@@ -3,14 +3,14 @@ import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   Handle,
   Position,
+  useReactFlow,
+  ReactFlowProvider,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import dagre from "@dagrejs/dagre";
 
 /* ─── 샘플 데이터 (API로 수신 연결 필요) ─── */
 const SAMPLE_DATA = {
@@ -25,13 +25,7 @@ const SAMPLE_DATA = {
           label: "Language Model",
           cfo: {
             label_id: "language model",
-            initial_keywords: [
-              "language model@en .",
-              "language modeling@en .",
-              "language models@en .",
-              "n-gram language models@en .",
-              "statistical language models@en .",
-            ],
+            initial_keywords: ["language model@en .", "language modeling@en .", "language models@en .", "n-gram language models@en .", "statistical language models@en ."],
           },
           children: [
             { paper_id: "2412.03884", assignment: { score: 1.0, was_reexpressed: false } },
@@ -51,12 +45,7 @@ const SAMPLE_DATA = {
           label: "Transformer",
           cfo: {
             label_id: "transformer",
-            initial_keywords: [
-              "transformer@en .",
-              "attention mechanism@en .",
-              "self-attention@en .",
-              "multi-head attention@en .",
-            ],
+            initial_keywords: ["transformer@en .", "attention mechanism@en .", "self-attention@en .", "multi-head attention@en ."],
           },
           children: [
             { paper_id: "2301.00234", assignment: { score: 1.0, was_reexpressed: false } },
@@ -70,11 +59,7 @@ const SAMPLE_DATA = {
           label: "Deep Learning",
           cfo: {
             label_id: "deep learning",
-            initial_keywords: [
-              "deep learning@en .",
-              "deep neural network@en .",
-              "convolutional neural network@en .",
-            ],
+            initial_keywords: ["deep learning@en .", "deep neural network@en .", "convolutional neural network@en ."],
           },
           children: [
             { paper_id: "2401.10011", assignment: { score: 1.0, was_reexpressed: false } },
@@ -88,11 +73,7 @@ const SAMPLE_DATA = {
           label: "Policy Gradient",
           cfo: {
             label_id: "policy gradient",
-            initial_keywords: [
-              "policy gradient@en .",
-              "reinforcement learning@en .",
-              "reward function@en .",
-            ],
+            initial_keywords: ["policy gradient@en .", "reinforcement learning@en .", "reward function@en ."],
           },
           children: [
             { paper_id: "2401.20011", assignment: { score: 1.0, was_reexpressed: false } },
@@ -105,12 +86,7 @@ const SAMPLE_DATA = {
           label: "Object Detection",
           cfo: {
             label_id: "object detection",
-            initial_keywords: [
-              "object detection@en .",
-              "YOLO@en .",
-              "bounding box@en .",
-              "anchor-based detection@en .",
-            ],
+            initial_keywords: ["object detection@en .", "YOLO@en .", "bounding box@en .", "anchor-based detection@en ."],
           },
           children: [
             { paper_id: "2401.30011", assignment: { score: 1.0, was_reexpressed: false } },
@@ -125,11 +101,7 @@ const SAMPLE_DATA = {
           label: "Image Generation",
           cfo: {
             label_id: "image generation",
-            initial_keywords: [
-              "image generation@en .",
-              "diffusion model@en .",
-              "generative adversarial network@en .",
-            ],
+            initial_keywords: ["image generation@en .", "diffusion model@en .", "generative adversarial network@en ."],
           },
           children: [
             { paper_id: "2401.40011", assignment: { score: 1.0, was_reexpressed: false } },
@@ -142,11 +114,7 @@ const SAMPLE_DATA = {
           label: "Text Classification",
           cfo: {
             label_id: "text classification",
-            initial_keywords: [
-              "text classification@en .",
-              "sentiment analysis@en .",
-              "document classification@en .",
-            ],
+            initial_keywords: ["text classification@en .", "sentiment analysis@en .", "document classification@en ."],
           },
           children: [
             { paper_id: "2401.50011", assignment: { score: 0.9, was_reexpressed: false } },
@@ -159,11 +127,7 @@ const SAMPLE_DATA = {
           label: "Machine Translation",
           cfo: {
             label_id: "machine translation",
-            initial_keywords: [
-              "machine translation@en .",
-              "neural machine translation@en .",
-              "sequence to sequence@en .",
-            ],
+            initial_keywords: ["machine translation@en .", "neural machine translation@en .", "sequence to sequence@en ."],
           },
           children: [
             { paper_id: "2401.60011", assignment: { score: 1.0, was_reexpressed: false } },
@@ -193,33 +157,40 @@ function parseData(data) {
   }));
 }
 
-/* ─── Node dimensions (dagre와 커스텀 노드 크기 일치) ─── */
+/* ─── Layout Constants ─── */
 const ROOT_W = 120;
 const ROOT_H = 120;
 const TOPIC_W = 156;
 const TOPIC_H = 40;
+const PAPER_W = 148;
+const PAPER_H = 56;
+const TOPIC_RADIUS = 350;
+const SPREAD_ANGLE = Math.PI * 1.2; // 216° 부채꼴
 
-/* ─── dagre 자동 레이아웃 ─── */
-function getLayoutedElements(nodes, edges) {
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: "TB", ranksep: 100, nodesep: 28 });
-  g.setDefaultEdgeLabel(() => ({}));
+/* ─── 엣지 방향 결정 (최적 handle 선택) ─── */
+function getHandleDir(fromX, fromY, toX, toY) {
+  const a = (Math.atan2(toY - fromY, toX - fromX) * 180) / Math.PI;
+  if (a > -45 && a <= 45)   return { src: "right",  tgt: "left"   };
+  if (a > 45  && a <= 135)  return { src: "bottom", tgt: "top"    };
+  if (a > 135 || a <= -135) return { src: "left",   tgt: "right"  };
+  return                           { src: "top",    tgt: "bottom" };
+}
 
-  nodes.forEach((n) => {
-    g.setNode(n.id, {
-      width: n.type === "rootNode" ? ROOT_W : TOPIC_W,
-      height: n.type === "rootNode" ? ROOT_H : TOPIC_H,
-    });
-  });
-  edges.forEach((e) => g.setEdge(e.source, e.target));
-  dagre.layout(g);
+/* ─── 전방향 Handle (모든 노드 공용) ─── */
+const ALL_DIRS = [
+  { pos: Position.Top,    dir: "top"    },
+  { pos: Position.Bottom, dir: "bottom" },
+  { pos: Position.Left,   dir: "left"   },
+  { pos: Position.Right,  dir: "right"  },
+];
 
-  return nodes.map((n) => {
-    const { x, y } = g.node(n.id);
-    const w = n.type === "rootNode" ? ROOT_W : TOPIC_W;
-    const h = n.type === "rootNode" ? ROOT_H : TOPIC_H;
-    return { ...n, position: { x: x - w / 2, y: y - h / 2 } };
-  });
+function AllHandles() {
+  return ALL_DIRS.map(({ pos, dir }) => (
+    <React.Fragment key={dir}>
+      <Handle type="source" position={pos} id={`src-${dir}`} style={{ opacity: 0 }} isConnectable={false} />
+      <Handle type="target" position={pos} id={`tgt-${dir}`} style={{ opacity: 0 }} isConnectable={false} />
+    </React.Fragment>
+  ));
 }
 
 /* ─── Custom Nodes ─── */
@@ -227,9 +198,9 @@ function RootNode({ data }) {
   return (
     <div
       style={{ width: ROOT_W, height: ROOT_H }}
-      className="rounded-full bg-linear-to-br from-[#5B8DEF] to-[#2B4CBF] flex flex-col items-center justify-center border-2 border-[#7BA7F7]/50 shadow-lg"
+      className="rounded-full bg-linear-to-br from-[#5B8DEF] to-[#2B4CBF] flex flex-col items-center justify-center border-2 border-[#7BA7F7]/50 shadow-lg select-none"
     >
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} isConnectable={false} />
+      <AllHandles />
       <span className="text-white font-bold text-sm font-mono text-center leading-snug px-2">
         {data.label.split(".")[0]}
         <br />.{data.label.split(".")[1] ?? ""}
@@ -243,20 +214,20 @@ function TopicNode({ data }) {
   return (
     <div
       style={{ width: TOPIC_W, height: TOPIC_H }}
-      className={`relative flex items-center justify-center rounded-full cursor-pointer transition-colors
-        ${data.isSelected
-          ? "bg-[#4338CA] shadow-lg shadow-indigo-500/25"
+      className={`relative flex items-center justify-center rounded-full cursor-pointer transition-colors select-none
+        ${data.isExpanded
+          ? "bg-[#4338CA] shadow-lg shadow-indigo-500/30"
           : "bg-[#1E293B] hover:bg-[#334155]"
         }`}
     >
-      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} isConnectable={false} />
+      <AllHandles />
       <span className="text-white text-[11.5px] font-medium px-4 truncate">
         {data.label}
       </span>
       {data.paperCount > 0 && (
         <div
           className={`absolute -top-2 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white
-            ${data.isSelected ? "bg-[#818CF8]" : "bg-[#6366F1]"}`}
+            ${data.isExpanded ? "bg-[#818CF8]" : "bg-[#6366F1]"}`}
         >
           {data.paperCount}
         </div>
@@ -265,188 +236,194 @@ function TopicNode({ data }) {
   );
 }
 
-const nodeTypes = { rootNode: RootNode, topicNode: TopicNode };
-
-/* ─── 그래프 노드/엣지 초기값 빌드 ─── */
-function buildGraph(root) {
-  const rawNodes = [
-    {
-      id: root.id,
-      type: "rootNode",
-      position: { x: 0, y: 0 },
-      data: { label: root.label },
-      selectable: false,
-    },
-    ...root.topics.map((topic) => ({
-      id: topic.id,
-      type: "topicNode",
-      position: { x: 0, y: 0 },
-      data: { label: topic.label, paperCount: topic.papers.length, isSelected: false },
-    })),
-  ];
-
-  const rawEdges = root.topics.map((topic) => ({
-    id: `e-${root.id}-${topic.id}`,
-    source: root.id,
-    target: topic.id,
-    style: { stroke: "#CBD5E1", strokeWidth: 1.5, strokeDasharray: "5 4" },
-  }));
-
-  return { nodes: getLayoutedElements(rawNodes, rawEdges), edges: rawEdges };
-}
-
-/* ─── Paper Item ─── */
-function PaperItem({ paper }) {
-  const score = paper.assignment?.score ?? 0;
+function PaperNode({ data }) {
+  const score = data.score ?? 0;
   const scoreStyle =
-    score >= 0.8
-      ? { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" }
-      : score >= 0.5
-        ? { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" }
-        : { bg: "bg-red-50", text: "text-red-600", border: "border-red-200" };
+    score >= 0.8 ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+    : score >= 0.5 ? "text-amber-600 bg-amber-50 border-amber-200"
+    : "text-red-600 bg-red-50 border-red-200";
 
   return (
     <a
-      href={`https://arxiv.org/abs/${paper.paper_id}`}
+      href={`https://arxiv.org/abs/${data.paperId}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-3 p-3 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] transition-colors group"
+      style={{ width: PAPER_W }}
+      className="block bg-white border border-[#E2E8F0] rounded-xl px-3 py-2.5 shadow-sm hover:shadow-md hover:border-[#6366F1]/40 transition-all cursor-pointer"
     >
-      <div className="w-8 h-8 rounded-lg bg-[#EEF2FF] flex items-center justify-center shrink-0">
-        <svg className="w-4 h-4 text-[#6366F1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
+      <AllHandles />
+      <p className="text-[10px] font-mono font-semibold text-[#334155] truncate">
+        arXiv:{data.paperId}
+      </p>
+      <div className="flex items-center gap-1.5 mt-1">
+        <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${scoreStyle}`}>
+          {score.toFixed(1)}
+        </span>
+        {data.wasReexpressed && (
+          <span className="text-[9px] text-[#94A3B8] italic">re-exp</span>
+        )}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-[#334155] font-mono tracking-wide">
-          arXiv:{paper.paper_id}
-        </p>
-        <div className="flex items-center gap-2 mt-1">
-          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${scoreStyle.bg} ${scoreStyle.text} ${scoreStyle.border}`}>
-            Score {score.toFixed(1)}
-          </span>
-          {paper.assignment?.was_reexpressed && (
-            <span className="text-[10px] text-[#94A3B8] italic">re-expressed</span>
-          )}
-        </div>
-      </div>
-      <svg className="w-3.5 h-3.5 text-[#CBD5E1] group-hover:text-[#6366F1] transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-      </svg>
     </a>
   );
 }
 
-/* ─── Paper Side Panel ─── */
-function PaperPanel({ topic }) {
-  if (!topic) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-8">
-        <div className="w-14 h-14 rounded-full bg-[#EEF2FF] flex items-center justify-center">
-          <svg className="w-7 h-7 text-[#818CF8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        </div>
-        <div>
-          <p className="text-sm font-medium text-[#475569]">토픽 노드를 선택하세요</p>
-          <p className="text-xs text-[#94A3B8] mt-1 leading-relaxed">
-            그래프에서 노드를 클릭하면
-            <br />관련 논문 목록이 표시됩니다
-          </p>
-        </div>
-      </div>
-    );
-  }
+const nodeTypes = { rootNode: RootNode, topicNode: TopicNode, paperNode: PaperNode };
 
-  const highRelCount = topic.papers.filter((p) => (p.assignment?.score ?? 0) >= 0.8).length;
+/* ─── 초기 그래프 빌드 (root + 방사형 topic) ─── */
+function buildInitialGraph(root) {
+  const n = root.topics.length;
+  const topicAngles = {};
 
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-5 py-4 border-b border-[#F1F5F9] shrink-0 bg-[#FAFBFF]">
-        <h3 className="font-bold text-[#1E293B] text-sm leading-tight">{topic.label}</h3>
-        {topic.path.length > 0 && (
-          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-            {topic.path.map((part, i) => (
-              <React.Fragment key={i}>
-                <span className="text-[10px] text-[#94A3B8]">{part}</span>
-                {i < topic.path.length - 1 && (
-                  <span className="text-[10px] text-[#CBD5E1]">›</span>
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-        <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-          <span className="text-[11px] font-semibold text-[#6366F1] bg-[#EEF2FF] px-2.5 py-0.5 rounded-full">
-            {topic.papers.length}편의 논문
-          </span>
-          {highRelCount > 0 && (
-            <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
-              고관련 {highRelCount}편
-            </span>
-          )}
-        </div>
-        {topic.keywords.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2.5">
-            {topic.keywords.slice(0, 4).map((kw, i) => (
-              <span key={i} className="text-[10px] text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded-full">
-                {kw.replace(/@en\s*\.?\s*$/, "").trim()}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-        {topic.papers.map((paper) => (
-          <PaperItem key={paper.paper_id} paper={paper} />
-        ))}
-      </div>
-    </div>
-  );
+  const nodes = [{
+    id: root.id,
+    type: "rootNode",
+    position: { x: -ROOT_W / 2, y: -ROOT_H / 2 },
+    data: { label: root.label },
+    selectable: false,
+    draggable: false,
+  }];
+
+  const edges = [];
+
+  root.topics.forEach((topic, i) => {
+    const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+    topicAngles[topic.id] = angle;
+    const tx = Math.cos(angle) * TOPIC_RADIUS;
+    const ty = Math.sin(angle) * TOPIC_RADIUS;
+
+    nodes.push({
+      id: topic.id,
+      type: "topicNode",
+      position: { x: tx - TOPIC_W / 2, y: ty - TOPIC_H / 2 },
+      data: { label: topic.label, paperCount: topic.papers.length, isExpanded: false },
+    });
+
+    const { src, tgt } = getHandleDir(0, 0, tx, ty);
+    edges.push({
+      id: `e-root-${topic.id}`,
+      source: root.id,
+      target: topic.id,
+      sourceHandle: `src-${src}`,
+      targetHandle: `tgt-${tgt}`,
+      style: { stroke: "#CBD5E1", strokeWidth: 1.5, strokeDasharray: "5 4" },
+    });
+  });
+
+  return { nodes, edges, topicAngles };
 }
 
-/* ─── Roadmap Page ─── */
-function Roadmap() {
-  const [selectedId, setSelectedId] = useState(null);
-  const roots = useMemo(() => parseData(SAMPLE_DATA), []);
-  const root = roots[0];
+/* ─── Topic 클릭 시 paper 노드/엣지 생성 ─── */
+function buildExpansion(topic, angle) {
+  const papers = topic.papers;
+  if (!papers.length) return { nodes: [], edges: [] };
 
-  const { nodes: initNodes, edges: initEdges } = useMemo(() => buildGraph(root), [root]);
+  const n = papers.length;
+  const tx = Math.cos(angle) * TOPIC_RADIUS;
+  const ty = Math.sin(angle) * TOPIC_RADIUS;
+
+  // paper 수에 따라 반경 동적 조정 (겹침 방지)
+  const paperRadius = Math.max(180, (n * (PAPER_W + 20)) / SPREAD_ANGLE);
+
+  const nodes = [];
+  const edges = [];
+
+  papers.forEach((paper, i) => {
+    const paperAngle =
+      n === 1 ? angle : angle - SPREAD_ANGLE / 2 + (SPREAD_ANGLE * i) / (n - 1);
+    const px = tx + Math.cos(paperAngle) * paperRadius;
+    const py = ty + Math.sin(paperAngle) * paperRadius;
+    const id = `paper-${paper.paper_id}`;
+
+    nodes.push({
+      id,
+      type: "paperNode",
+      position: { x: px - PAPER_W / 2, y: py - PAPER_H / 2 },
+      data: {
+        paperId: paper.paper_id,
+        score: paper.assignment?.score ?? 0,
+        wasReexpressed: paper.assignment?.was_reexpressed ?? false,
+      },
+    });
+
+    const { src, tgt } = getHandleDir(tx, ty, px, py);
+    edges.push({
+      id: `e-${topic.id}-${paper.paper_id}`,
+      source: topic.id,
+      target: id,
+      sourceHandle: `src-${src}`,
+      targetHandle: `tgt-${tgt}`,
+      style: { stroke: "#818CF8", strokeWidth: 1.2 },
+    });
+  });
+
+  return { nodes, edges };
+}
+
+/* ─── Inner Flow (useReactFlow 사용) ─── */
+function RoadmapFlow({ root, roots }) {
+  const { fitView } = useReactFlow();
+  const [expandedId, setExpandedId] = useState(null);
+
+  const { nodes: initNodes, edges: initEdges, topicAngles } = useMemo(
+    () => buildInitialGraph(root),
+    [root]
+  );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
 
-  useEffect(() => {
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.type === "topicNode"
-          ? { ...n, data: { ...n.data, isSelected: n.id === selectedId } }
-          : n
-      )
-    );
-    setEdges((eds) =>
-      eds.map((e) => ({
-        ...e,
-        style: {
-          stroke: e.target === selectedId ? "#6366F1" : "#CBD5E1",
-          strokeWidth: e.target === selectedId ? 2.5 : 1.5,
-          strokeDasharray: e.target === selectedId ? undefined : "5 4",
-        },
-      }))
-    );
-  }, [selectedId, setNodes, setEdges]);
-
   const onNodeClick = useCallback((_, node) => {
     if (node.type !== "topicNode") return;
-    setSelectedId((prev) => (prev === node.id ? null : node.id));
+    setExpandedId((prev) => (prev === node.id ? null : node.id));
   }, []);
 
-  const selectedTopic = useMemo(() => {
-    if (!selectedId || !root) return null;
-    return root.topics.find((t) => t.id === selectedId) ?? null;
-  }, [selectedId, root]);
+  // expandedId 변경 → 노드/엣지 동기화
+  useEffect(() => {
+    const topic = expandedId ? root.topics.find((t) => t.id === expandedId) : null;
+    const expansion = topic
+      ? buildExpansion(topic, topicAngles[expandedId])
+      : { nodes: [], edges: [] };
 
-  const totalPapers = root?.topics.reduce((sum, t) => sum + t.papers.length, 0) ?? 0;
+    setNodes((nds) => [
+      ...nds
+        .filter((n) => n.type !== "paperNode")
+        .map((n) =>
+          n.type === "topicNode"
+            ? { ...n, data: { ...n.data, isExpanded: n.id === expandedId } }
+            : n
+        ),
+      ...expansion.nodes,
+    ]);
+
+    setEdges((eds) => [
+      ...eds
+        .filter((e) => e.id.startsWith("e-root-"))
+        .map((e) => ({
+          ...e,
+          style: {
+            stroke: e.target === expandedId ? "#6366F1" : "#CBD5E1",
+            strokeWidth: e.target === expandedId ? 2.5 : 1.5,
+            strokeDasharray: e.target === expandedId ? undefined : "5 4",
+          },
+        })),
+      ...expansion.edges,
+    ]);
+  }, [expandedId, root, topicAngles, setNodes, setEdges]);
+
+  // 펼쳐진 topic 영역으로 카메라 포커스
+  useEffect(() => {
+    const topic = expandedId ? root.topics.find((t) => t.id === expandedId) : null;
+    const nodeIds = topic
+      ? [{ id: expandedId }, ...topic.papers.map((p) => ({ id: `paper-${p.paper_id}` }))]
+      : undefined;
+
+    const timer = setTimeout(() => {
+      fitView({ nodes: nodeIds, duration: 600, padding: 0.3 });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [expandedId, root, fitView]);
+
+  const totalPapers = root.topics.reduce((s, t) => s + t.papers.length, 0);
 
   return (
     <div className="mx-auto max-w-screen-3xl px-8 py-8 flex flex-col gap-6">
@@ -468,7 +445,7 @@ function Roadmap() {
         <div className="flex items-center gap-2 bg-white rounded-xl border border-[#E2E8F0] px-4 py-2 shadow-sm">
           <div className="w-2 h-2 rounded-full bg-[#6366F1]" />
           <span className="text-xs font-medium text-[#334155]">토픽 노드</span>
-          <span className="text-xs font-bold text-[#6366F1]">{root?.topics.length ?? 0}</span>
+          <span className="text-xs font-bold text-[#6366F1]">{root.topics.length}</span>
         </div>
         <div className="flex items-center gap-2 bg-white rounded-xl border border-[#E2E8F0] px-4 py-2 shadow-sm">
           <div className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -480,69 +457,52 @@ function Roadmap() {
         </span>
       </div>
 
-      {/* Main: Graph + Side Panel */}
+      {/* Graph */}
       <div
-        className="flex gap-6"
-        style={{ height: "calc(100vh - 260px)", minHeight: "560px" }}
+        className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden"
+        style={{ height: "calc(100vh - 260px)", minHeight: "600px" }}
       >
-        {/* Graph area */}
-        <div className="flex-1 min-w-0 rounded-2xl border border-[#E2E8F0] bg-white shadow-sm flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#F1F5F9] shrink-0">
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-[#6366F1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span className="font-semibold text-[#1E293B] text-sm">연구 로드맵</span>
-            </div>
-            <span className="text-xs text-[#94A3B8]">노드를 클릭하여 논문을 탐색하세요</span>
-          </div>
-          <div className="flex-1">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onNodeClick={onNodeClick}
-              nodeTypes={nodeTypes}
-              fitView
-              fitViewOptions={{ padding: 0.2 }}
-              minZoom={0.3}
-              maxZoom={2}
-              proOptions={{ hideAttribution: true }}
-            >
-              <Background color="#E2E8F0" gap={20} />
-              <Controls showInteractive={false} />
-              <MiniMap
-                nodeColor={(n) => (n.type === "rootNode" ? "#3B5BDB" : "#1E293B")}
-                maskColor="rgba(255,255,255,0.7)"
-                style={{ border: "1px solid #E2E8F0", borderRadius: 8 }}
-              />
-            </ReactFlow>
-          </div>
-        </div>
-
-        {/* Side panel */}
-        <div className="w-[340px] shrink-0 rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden flex flex-col">
-          <div className="flex items-center gap-2 px-5 pt-5 pb-3 border-b border-[#F1F5F9] shrink-0">
+        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#F1F5F9]">
+          <div className="flex items-center gap-2">
             <svg className="w-4 h-4 text-[#6366F1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span className="font-semibold text-[#1E293B] text-sm">논문 목록</span>
-            {selectedTopic && (
-              <button
-                onClick={() => setSelectedId(null)}
-                className="ml-auto text-[11px] text-[#94A3B8] hover:text-[#334155] transition-colors"
-              >
-                닫기 ✕
-              </button>
-            )}
+            <span className="font-semibold text-[#1E293B] text-sm">연구 로드맵</span>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <PaperPanel topic={selectedTopic} />
-          </div>
+          <span className="text-xs text-[#94A3B8]">토픽 노드를 클릭하여 논문을 펼쳐보세요</span>
+        </div>
+        <div style={{ height: "calc(100% - 57px)" }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={onNodeClick}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.25 }}
+            minZoom={0.15}
+            maxZoom={2.5}
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background color="#E2E8F0" gap={20} />
+            <Controls showInteractive={false} />
+          </ReactFlow>
         </div>
       </div>
     </div>
+  );
+}
+
+/* ─── Roadmap Page ─── */
+function Roadmap() {
+  const roots = useMemo(() => parseData(SAMPLE_DATA), []);
+  const root = roots[0];
+
+  return (
+    <ReactFlowProvider>
+      <RoadmapFlow root={root} roots={roots} />
+    </ReactFlowProvider>
   );
 }
 
