@@ -8,3 +8,6 @@ dist/
 
 .env
 .env.local
+layout-compare.html
+login-compare.html
+roadmap-compare.html
