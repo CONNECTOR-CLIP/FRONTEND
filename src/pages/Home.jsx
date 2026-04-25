@@ -1,6 +1,7 @@
 import { useRef, useLayoutEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { prepareWithSegments, layoutWithLines } from "@chenglou/pretext";
+import { RoadmapPreview } from "@/pages/Roadmap";
 
 /* ─── 목데이터 ─── */
 const trendingKeywords = [
@@ -53,122 +54,6 @@ const recentPapers = [
     date: "Sep 28, 2023",
   },
 ];
-
-/* ─── 마인드맵 목데이터 ─── */
-function RoadmapGraph() {
-  const cx = 440,
-    cy = 240;
-  const nodes = [
-    {
-      id: "center",
-      x: cx,
-      y: cy,
-      label: "Deep\nLearning",
-      sub: "CORE ENTITY",
-      r: 52,
-      main: true,
-    },
-    { id: "nn", x: cx - 200, y: cy - 140, label: "Neural Networks", r: 38 },
-    { id: "tr", x: cx - 240, y: cy + 20, label: "Transformer", r: 38 },
-    { id: "bt", x: cx + 160, y: cy - 110, label: "BerTopic", r: 34 },
-    { id: "am", x: cx + 140, y: cy + 80, label: "AI Models", r: 36 },
-    { id: "am2", x: cx - 40, y: cy + 160, label: "AI Models", r: 36 },
-  ];
-  const edges = [
-    ["center", "nn"],
-    ["center", "tr"],
-    ["center", "bt"],
-    ["center", "am"],
-    ["center", "am2"],
-  ];
-
-  return (
-    <svg
-      viewBox="0 0 880 480"
-      className="w-full h-full"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      {/* edges */}
-      {edges.map(([a, b], i) => {
-        const na = nodes.find((n) => n.id === a);
-        const nb = nodes.find((n) => n.id === b);
-        return (
-          <line
-            key={i}
-            x1={na.x}
-            y1={na.y}
-            x2={nb.x}
-            y2={nb.y}
-            stroke="#CBD5E1"
-            strokeWidth="1.5"
-            strokeDasharray="4 3"
-          />
-        );
-      })}
-      {/* nodes */}
-      {nodes.map((node) => (
-        <g key={node.id}>
-          {node.main ? (
-            <>
-              <circle cx={node.x} cy={node.y} r={node.r} fill="#3B5BDB" />
-              <text
-                x={node.x}
-                y={node.y - 8}
-                textAnchor="middle"
-                fill="white"
-                fontSize="13"
-                fontWeight="600"
-              >
-                {node.label.split("\n")[0]}
-              </text>
-              <text
-                x={node.x}
-                y={node.y + 8}
-                textAnchor="middle"
-                fill="white"
-                fontSize="13"
-                fontWeight="600"
-              >
-                {node.label.split("\n")[1]}
-              </text>
-              <text
-                x={node.x}
-                y={node.y + 24}
-                textAnchor="middle"
-                fill="#BFD0FF"
-                fontSize="9"
-                letterSpacing="1"
-              >
-                {node.sub}
-              </text>
-            </>
-          ) : (
-            <>
-              <rect
-                x={node.x - node.r}
-                y={node.y - 16}
-                width={node.r * 2}
-                height={32}
-                rx={16}
-                fill="#1E293B"
-              />
-              <text
-                x={node.x}
-                y={node.y + 5}
-                textAnchor="middle"
-                fill="white"
-                fontSize="11.5"
-                fontWeight="500"
-              >
-                {node.label}
-              </text>
-            </>
-          )}
-        </g>
-      ))}
-    </svg>
-  );
-}
 
 /* ─── 활동 ─── */
 function ActivityIcon({ type }) {
@@ -311,6 +196,7 @@ function PaperCard({ paper }) {
 /* ─── Home Page ─── */
 function Home() {
   const navigate = useNavigate();
+  const [flowInstance, setFlowInstance] = useState(null);
   return (
     <div className="mx-auto max-w-screen-3xl px-8 py-8 flex flex-col gap-6">
       {/* ── 상단: 타이틀 + 로드맵(좌) / 사이드바(우) ── */}
@@ -350,7 +236,7 @@ function Home() {
 
             {/* graph area */}
             <div className="h-160 bg-white mx-4 rounded-xl overflow-hidden">
-              <RoadmapGraph />
+              <RoadmapPreview onInit={setFlowInstance} />
             </div>
 
             {/* expand button */}
@@ -358,6 +244,7 @@ function Home() {
               <div className="flex gap-1.5 ml-1">
                 <button
                   id="zoom-in"
+                  onClick={() => flowInstance?.zoomIn({ duration: 200 })}
                   className="rounded-full w-6 h-6 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
                 >
                   <svg
@@ -395,6 +282,7 @@ function Home() {
                 </button>
                 <button
                   id="zoom-out"
+                  onClick={() => flowInstance?.zoomOut({ duration: 200 })}
                   className="rounded-full w-6 h-6 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
                 >
                   <svg
