@@ -526,8 +526,8 @@ function buildExpansion(topic, angle) {
   return { nodes, edges };
 }
 
-/* ─── Inner Flow (useReactFlow 사용) ─── */
-function RoadmapFlow({ root, roots }) {
+/* ─── 공유 상태 훅 (ReactFlowProvider 내부에서만 호출) ─── */
+function useRoadmapFlow(root) {
   const { fitView } = useReactFlow();
   const [expandedId, setExpandedId] = useState(null);
 
@@ -597,6 +597,14 @@ function RoadmapFlow({ root, roots }) {
     }, 80);
     return () => clearTimeout(timer);
   }, [expandedId, root, fitView]);
+
+  return { nodes, edges, onNodesChange, onEdgesChange, onNodeClick };
+}
+
+/* ─── Inner Flow (useReactFlow 사용) ─── */
+function RoadmapFlow({ root, roots }) {
+  const { nodes, edges, onNodesChange, onEdgesChange, onNodeClick } =
+    useRoadmapFlow(root);
 
   const totalPapers = root.topics.reduce((s, t) => s + t.papers.length, 0);
 
@@ -689,7 +697,45 @@ function RoadmapFlow({ root, roots }) {
     </div>
   );
 }
-/*jira test*/
+
+/* ─── Preview Flow Inner (Home page 임베드용, ReactFlowProvider 내부) ─── */
+function PreviewFlowInner({ root, onInit }) {
+  const { nodes, edges, onNodesChange, onEdgesChange, onNodeClick } =
+    useRoadmapFlow(root);
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onNodeClick={onNodeClick}
+      nodeTypes={nodeTypes}
+      onInit={onInit}
+      fitView
+      fitViewOptions={{ padding: 0.3 }}
+      minZoom={0.1}
+      maxZoom={2.5}
+      zoomOnScroll={false}
+      panOnScroll={false}
+      proOptions={{ hideAttribution: true }}
+    >
+      <Background color="#E2E8F0" gap={20} />
+    </ReactFlow>
+  );
+}
+
+/* ─── Roadmap Preview (Home page에서 import하여 사용) ─── */
+export function RoadmapPreview({ onInit }) {
+  const roots = useMemo(() => parseData(SAMPLE_DATA), []);
+  const root = roots[0];
+
+  return (
+    <ReactFlowProvider>
+      <PreviewFlowInner root={root} onInit={onInit} />
+    </ReactFlowProvider>
+  );
+}
 
 /* ─── Roadmap Page ─── */
 function Roadmap() {
