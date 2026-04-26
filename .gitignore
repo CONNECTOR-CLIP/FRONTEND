@@ -1,9 +1,13 @@
 .vscode
 .env
 node_modules/
+dist/
 
 *.log
 .DS_Store
 
 .env
 .env.local
+layout-compare.html
+login-compare.html
+roadmap-compare.html
