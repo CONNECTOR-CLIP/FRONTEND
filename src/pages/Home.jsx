@@ -245,10 +245,10 @@ function Home() {
                 <button
                   id="zoom-in"
                   onClick={() => flowInstance?.zoomIn({ duration: 200 })}
-                  className="rounded-full w-6 h-6 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
+                  className="rounded-full w-15 h-15 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
                 >
                   <svg
-                    className="w-3.5 h-3.5"
+                    className="w-8 h-8"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -283,10 +283,10 @@ function Home() {
                 <button
                   id="zoom-out"
                   onClick={() => flowInstance?.zoomOut({ duration: 200 })}
-                  className="rounded-full w-6 h-6 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
+                  className="rounded-full w-15 h-15 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
                 >
                   <svg
-                    className="w-3.5 h-3.5"
+                    className="w-8 h-8"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -313,11 +313,11 @@ function Home() {
                 <button
                   id="expand"
                   onClick={() => navigate("/roadmap")}
-                  className="rounded-full w-6 h-6 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
+                  className="rounded-full w-15 h-15 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors"
                 >
                   <svg
-                    width="11"
-                    height="11"
+                    width="20"
+                    height="20"
                     viewBox="0 0 11 11"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -405,7 +405,7 @@ function Home() {
             </div>
           </div>
 
-          {/* Recent Activities */}
+          {/* 최근활동 */}
           <div className="rounded-2xl border border-[#E2E8F0] bg-[#EFF3FF] shadow-sm p-8">
             <h3 className="font-semibold text-[#1E293B] text-sm mb-4">
               최근 활동
