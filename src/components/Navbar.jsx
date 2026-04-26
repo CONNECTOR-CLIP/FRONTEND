@@ -26,7 +26,7 @@ function Navbar() {
           </div>
           <div
             id="nav-contents"
-            className="flex items-center gap-[32px] text-[#64748B]"
+            className="flex items-center gap-8 text-[#64748B]"
           >
             <button
               onClick={() => navigate("/Features")}
@@ -53,7 +53,7 @@ function Navbar() {
               Documentation
             </button>
           </div>
-          <div id="profile" className="flex items-center gap-[24px]">
+          <div id="profile" className="flex items-center gap-6">
             <button
               onClick={() => setShowLogin(true)}
               className="text-[16px] text-[#64748B] hover:text-black"

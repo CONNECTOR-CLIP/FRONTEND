@@ -2,75 +2,129 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AlertModal from "./AlertModal";
 
+const NAV_ITEMS = [
+  {
+    label: "Dashboard",
+    path: "/home",
+    icon: (
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M4 6h16M4 10h16M4 14h16M4 18h16"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: "검색하기",
+    path: "/Research",
+    icon: (
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: "검색기록",
+    path: "/roadmap",
+    icon: (
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: "Network",
+    path: "/network",
+    icon: null,
+  },
+];
+
 function ContentNavbar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [showLogin, setShowLogin] = useState(false);
   const [showalert, setShowalert] = useState(false);
-  const hasAlert = true; // 알림 존재 여부 (추후 실제 데이터로 교체)
-  const [showsetting, setShowsetting] = useState(false);
-  const [showmyprofile, setShowmyprofile] = useState(false);
+  const hasAlert = true;
 
   return (
     <>
       <nav className="w-full border-b border-gray-200 bg-white/60 backdrop-blur-md">
-        <div
-          id="navbar"
-          className="mx-auto flex h-16 max-w-9xl items-center justify-between px-8"
-        >
-          {/* 왼쪽: 로고 + 네비게이션 */}
-          <div className="flex items-center gap-[348px]">
-            <div
-              id="logo"
-              className="text-xl font-extrabold tracking-tight text-[#1D4ED8]"
-            >
-              <button
-                onClick={() => navigate("/home")}
-                className="w-[50px] h-[32px] text-[24px] font-extrabold hover:cursor-pointer"
-              >
-                CLIP
-              </button>
-            </div>
-            <div
-              id="nav-contents"
-              className="flex items-center gap-8 text-[#64748B]"
-            >
-              {[
-                { label: "Dashboard", path: "/home" },
-                { label: "검색하기", path: "/Research" },
-                { label: "검색기록", path: "/Documentation" },
-              ].map(({ label, path }) => {
-                const active = pathname === path;
-                return (
-                  <button
-                    key={path}
-                    onClick={() => navigate(path)}
-                    className={`text-sm cursor-pointer border-b-2 pb-0.5 transition-colors ${
+        <div className="relative flex h-16 w-full items-center justify-between px-8">
+          {/* 로고 */}
+          <button
+            onClick={() => navigate("/home")}
+            className="text-[24px] font-extrabold text-[#1D4ED8] hover:cursor-pointer shrink-0"
+          >
+            CLIP
+          </button>
+
+          {/* 가운데 메뉴 — absolute 중앙 정렬 */}
+          <div className="absolute left-[35%] -translate-x-1/2 flex items-center gap-5">
+            {NAV_ITEMS.map(({ label, path, icon }) => {
+              const active = pathname === path;
+              return (
+                <button
+                  key={path}
+                  onClick={() => navigate(path)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+                    ${
                       active
-                        ? "text-[#1d4ed8] border-[#1d4ed8]"
-                        : "text-[#64748B] border-transparent hover:text-black"
+                        ? "text-[#1D4ED8]"
+                        : "text-[#64748B] hover:text-[#1E293B]"
                     }`}
+                >
+                  {icon && (
+                    <span
+                      className={active ? "text-[#1D4ED8]" : "text-[#94A3B8]"}
+                    >
+                      {icon}
+                    </span>
+                  )}
+                  <span
+                    className={
+                      active ? "border-b-2 border-[#1D4ED8] pb-0.5" : ""
+                    }
                   >
                     {label}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setShowLogin(true)}
-                className={`text-sm cursor-pointer border-b-2 pb-0.5 transition-colors border-transparent text-[#64748B] hover:text-black`}
-              >
-                Network
-              </button>
-            </div>
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          {/* 오른쪽: 검색바 + 프로필 */}
-          <div className="flex items-center gap-[53px]">
-            <div
-              id="search"
-              className="flex items-center gap-2 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 w-[300px] focus-within:border-[#1D4ED8] transition-colors"
-            >
+
+          {/* 오른쪽: 검색바 */}
+          <div className="flex items-center gap-20 shrink-0">
+            {/* 검색바 */}
+            <div className="flex items-center gap-2 rounded-full border border-[#E2E8F0] bg-[#f9f9f9] px-4 py-2 w-80 focus-within:border-[#1D4ED8] transition-colors">
               <svg
-                className="w-4 h-4 text-[#94A3B8] shrink-0"
+                className="w-6 h-4 text-[#3e69a6] shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -84,15 +138,16 @@ function ContentNavbar() {
               </svg>
               <input
                 type="text"
-                placeholder="논문 검색..."
-                className="flex-1 bg-transparent text-sm text-[#1E293B] placeholder-[#94A3B8] outline-none"
+                placeholder="논문을 검색하세요..."
+                className="flex-1 bg-transparent text-sm text-[#1E293B] placeholder-[#3e69a6] outline-none"
               />
             </div>
-            <div id="profile" className="flex items-center gap-[24px]">
+
+            {/* 알림 + 설정 + 마이페이지 */}
+            <div className="flex gap-5">
               <button
-                id="alert"
-                className="cursor-pointer hover:svg-hover"
                 onClick={() => setShowalert(true)}
+                className="relative p-1 cursor-pointer"
               >
                 {hasAlert ? (
                   <svg
@@ -123,13 +178,15 @@ function ContentNavbar() {
                     xmlns="http://www.w3.org/2000/svg"
                   >
                     <path
-                      d="M0 17V15H2V8C2 6.61667 2.41667 5.3875 3.25 4.3125C4.08333 3.2375 5.16667 2.53333 6.5 2.2V1.5C6.5 1.08333 6.64583 0.729167 6.9375 0.4375C7.22917 0.145833 7.58333 0 8 0C8.41667 0 8.77083 0.145833 9.0625 0.4375C9.35417 0.729167 9.5 1.08333 9.5 1.5V2.2C10.8333 2.53333 11.9167 3.2375 12.75 4.3125C13.5833 5.3875 14 6.61667 14 8V15H16V17H0V17M8 9.5V9.5V9.5V9.5V9.5V9.5V9.5V9.5V9.5M8 20C7.45 20 6.97917 19.8042 6.5875 19.4125C6.19583 19.0208 6 18.55 6 18H10C10 18.55 9.80417 19.0208 9.4125 19.4125C9.02083 19.8042 8.55 20 8 20V20M4 15H12V8C12 6.9 11.6083 5.95833 10.825 5.175C10.0417 4.39167 9.1 4 8 4C6.9 4 5.95833 4.39167 5.175 5.175C4.39167 5.95833 4 6.9 4 8V15V15"
+                      d="M0 17V15H2V8C2 6.61667 2.41667 5.3875 3.25 4.3125C4.08333 3.2375 5.16667 2.53333 6.5 2.2V1.5C6.5 1.08333 6.64583 0.729167 6.9375 0.4375C7.22917 0.145833 7.58333 0 8 0C8.41667 0 8.77083 0.145833 9.0625 0.4375C9.35417 0.729167 9.5 1.08333 9.5 1.5V2.2C10.8333 2.53333 11.9167 3.2375 12.75 4.3125C13.5833 5.3875 14 6.61667 14 8V15H16V17H0ZM8 20C7.45 20 6.97917 19.8042 6.5875 19.4125C6.19583 19.0208 6 18.55 6 18H10C10 18.55 9.80417 19.0208 9.4125 19.4125C9.02083 19.8042 8.55 20 8 20ZM4 15H12V8C12 6.9 11.6083 5.95833 10.825 5.175C10.0417 4.39167 9.1 4 8 4C6.9 4 5.95833 4.39167 5.175 5.175C4.39167 5.95833 4 6.9 4 8V15Z"
                       fill="#466084"
                     />
                   </svg>
                 )}
               </button>
-              <button id="setting" onClick={() => setShowsetting(true)}>
+
+              {/* 설정 */}
+              <button className="p-1 cursor-pointer">
                 <svg
                   width="21"
                   height="20"
@@ -143,20 +200,23 @@ function ContentNavbar() {
                   />
                 </svg>
               </button>
-              <button id="profile" onClick={() => setShowmyprofile(true)}>
-                마이프로필
+
+              {/* 프로필 아바타 */}
+              <button className="w-9 h-9 rounded-full bg-[#CBD5E1] flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-[#1D4ED8] transition-all">
+                <svg
+                  className="w-6 h-6 text-[#64748B]"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                </svg>
               </button>
             </div>
           </div>
         </div>
       </nav>
 
-      {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
       {showalert && <AlertModal onClose={() => setShowalert(false)} />}
-      {showsetting && <SettingModal onClose={() => setShowsetting(false)} />}
-      {showmyprofile && (
-        <MyProfileModal onClose={() => setShowmyprofile(false)} />
-      )}
     </>
   );
 }
