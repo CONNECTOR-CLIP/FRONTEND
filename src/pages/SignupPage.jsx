@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { authApi } from "@/api";
 
 const USED_IDS = ["admin", "user123", "clip"];
 const USED_NICKNAMES = ["관리자", "운영자", "clip"];
@@ -9,6 +10,7 @@ function SignupPage() {
   const navigate = useNavigate();
   const [emailVerified, setEmailVerified] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [toast, setToast] = useState("");
 
@@ -73,7 +75,7 @@ function SignupPage() {
     setErrors((prev) => ({ ...prev, [field]: err }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (
       !form.id ||
       !form.password ||
@@ -98,7 +100,25 @@ function SignupPage() {
       showToast("이메일을 인증해주세요.");
       return;
     }
-    navigate("/signup/complete", { state: { nickname: form.nickname } });
+
+    setIsSubmitting(true);
+    try {
+      await authApi.signup({
+        id: form.id,
+        password: form.password,
+        nickname: form.nickname,
+        email: form.email,
+      });
+      navigate("/signup/complete", { state: { nickname: form.nickname } });
+    } catch (error) {
+      showToast(
+        error?.response?.data?.message ??
+          error?.response?.data?.error ??
+          "회원가입에 실패했습니다.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSendEmail = () => {
@@ -264,9 +284,10 @@ function SignupPage() {
 
         <button
           onClick={handleSubmit}
-          className="w-full h-12 font-bold rounded-lg transition-colors text-white bg-[#007aff] hover:bg-[#004f91]"
+          disabled={isSubmitting}
+          className="w-full h-12 font-bold rounded-lg transition-colors text-white bg-[#007aff] hover:bg-[#004f91] disabled:cursor-not-allowed disabled:bg-[#94A3B8]"
         >
-          회원가입
+          {isSubmitting ? "가입 중..." : "회원가입"}
         </button>
 
         <p className="text-center text-sm text-[#64748B]">

@@ -1,9 +1,74 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { authApi } from "@/api";
+import useAuthStore from "@/store/useAuthStore";
+
+function getToken(data) {
+  return (
+    data?.token ??
+    data?.accessToken ??
+    data?.access_token ??
+    data?.jwt ??
+    data?.data?.token ??
+    data?.data?.accessToken ??
+    null
+  );
+}
+
+function getUser(data) {
+  return data?.user ?? data?.member ?? data?.profile ?? data?.data?.user ?? data;
+}
+
+function getErrorMessage(error) {
+  return (
+    error?.response?.data?.message ??
+    error?.response?.data?.error ??
+    "로그인에 실패했습니다. 입력값을 확인해주세요."
+  );
+}
 
 function LoginModal({ onClose }) {
   const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
   const [saveId, setSaveId] = useState(false);
+  const [form, setForm] = useState({
+    email: localStorage.getItem("savedLoginId") ?? "",
+    password: "",
+  });
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleChange = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setError("");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.email.trim() || !form.password) {
+      setError("이메일과 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const data = await authApi.login({
+        email: form.email.trim(),
+        password: form.password,
+      });
+      const token = getToken(data);
+      if (saveId) localStorage.setItem("savedLoginId", form.email.trim());
+      else localStorage.removeItem("savedLoginId");
+      setAuth({ user: getUser(data), token });
+      onClose();
+      navigate("/home");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
@@ -17,7 +82,7 @@ function LoginModal({ onClose }) {
           <h2 className="text-2xl font-extrabold text-[#1D4ED8]">CLIP</h2>
         </div>
 
-        <div className="flex flex-col gap-6">
+        <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
           <p className="text-[15px]  font-bold">다시 만나 반가워요.</p>
           <div className="flex flex-col gap-1">
             <label className="text-regular font-medium text-[12px] text-gray-700">
@@ -25,6 +90,8 @@ function LoginModal({ onClose }) {
             </label>
             <input
               type="email"
+              value={form.email}
+              onChange={(e) => handleChange("email", e.target.value)}
               placeholder="email@example.com"
               className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-[#0060AD] focus:ring-1 focus:ring-[#0060AD]"
             />
@@ -35,6 +102,8 @@ function LoginModal({ onClose }) {
             </label>
             <input
               type="password"
+              value={form.password}
+              onChange={(e) => handleChange("password", e.target.value)}
               placeholder="••••••••"
               className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-[#0060AD] focus:ring-1 focus:ring-[#0060AD]"
             />
@@ -55,19 +124,31 @@ function LoginModal({ onClose }) {
               <span className="text-sm text-gray-600">아이디 저장하기</span>
             </div>
             <div>
-              <button className="text-sm text-[#0060AD] hover:underline">
+              <button
+                type="button"
+                className="text-sm text-[#0060AD] hover:underline"
+              >
                 아이디
               </button>
-              <button className="text-sm text-[#0060AD] hover:underline">
+              <button
+                type="button"
+                className="text-sm text-[#0060AD] hover:underline"
+              >
                 /비밀번호 찾기
               </button>
             </div>
           </div>
-        </div>
 
-        <button className="w-full h-[48px] bg-[#007aff] text-white font-bold rounded-lg hover:bg-[#004f91] transition-colors">
-          로그인
-        </button>
+          {error && <p className="text-sm text-red-500 -mt-3">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full h-[48px] bg-[#007aff] text-white font-bold rounded-lg hover:bg-[#004f91] transition-colors disabled:cursor-not-allowed disabled:bg-[#94A3B8]"
+          >
+            {isSubmitting ? "로그인 중..." : "로그인"}
+          </button>
+        </form>
 
         <div className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-gray-200" />

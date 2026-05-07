@@ -43,7 +43,7 @@ const NAV_ITEMS = [
   },
   {
     label: "검색기록",
-    path: "/roadmap",
+    path: "/history",
     icon: (
       <svg
         className="w-4 h-4"
@@ -55,7 +55,7 @@ const NAV_ITEMS = [
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth={2}
-          d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
         />
       </svg>
     ),
