@@ -5,6 +5,7 @@ import MainLayout from "@/layouts/MainLayout";
 import Home from "@/pages/Home";
 import Research from "@/pages/Research";
 import Roadmap from "@/pages/Roadmap";
+import SearchHistory from "@/pages/SearchHistory";
 import LandingPage from "@/pages/LandingPage";
 import SignupPage from "@/pages/SignupPage";
 import SignupCompletePage from "@/pages/SignupCompletePage";
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
           { path: "home", element: <Home /> },
           { path: "Research", element: <Research /> },
           { path: "roadmap", element: <Roadmap /> },
+          { path: "history", element: <SearchHistory /> },
         ],
       },
     ],

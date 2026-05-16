@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import { roadmapApi } from "@/api";
 import {
   ReactFlow,
   Background,
@@ -279,13 +281,13 @@ const SAMPLE_DATA = {
 
 /* ─── Data Parsing ─── */
 function parseData(data) {
-  return data.roots.map((root) => ({
+  return (data?.roots ?? []).map((root) => ({
     id: root.arxiv_primary_category,
     label: root.arxiv_primary_category,
-    topics: root.intermediate_nodes.map((node) => {
-      const pathParts = node.node_id.split("::");
+    topics: (root.intermediate_nodes ?? []).map((node) => {
+      const pathParts = (node.node_id ?? node.id ?? "").split("::");
       return {
-        id: node.node_id,
+        id: node.node_id ?? node.id,
         label: node.label,
         path: pathParts.slice(1, -1),
         keywords: node.cfo?.initial_keywords || [],
@@ -293,6 +295,16 @@ function parseData(data) {
       };
     }),
   }));
+}
+
+function resolveRoadmapData(data) {
+  return (
+    data?.roots ? data :
+    data?.data?.roots ? data.data :
+    data?.roadmap?.roots ? data.roadmap :
+    data?.data?.roadmap?.roots ? data.data.roadmap :
+    null
+  );
 }
 
 /* ─── Layout Constants ─── */
@@ -540,6 +552,12 @@ function useRoadmapFlow(root) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
 
+  useEffect(() => {
+    setExpandedId(null);
+    setNodes(initNodes);
+    setEdges(initEdges);
+  }, [initNodes, initEdges, setNodes, setEdges]);
+
   const onNodeClick = useCallback((_, node) => {
     if (node.type !== "topicNode") return;
     setExpandedId((prev) => (prev === node.id ? null : node.id));
@@ -602,7 +620,7 @@ function useRoadmapFlow(root) {
 }
 
 /* ─── Inner Flow (useReactFlow 사용) ─── */
-function RoadmapFlow({ root, roots }) {
+function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError }) {
   const { nodes, edges, onNodesChange, onEdgesChange, onNodeClick } =
     useRoadmapFlow(root);
 
@@ -614,7 +632,14 @@ function RoadmapFlow({ root, roots }) {
       <div>
         <h1 className="text-lg font-bold text-[#173355]">Research Roadmap</h1>
         <p className="mt-1 text-sm text-[#466084]">
-          연구 주제의 계층적 구조를 탐색하고 관련 논문을 확인하세요
+          {searchQuery ? (
+            <>
+              <span className="font-semibold text-[#1D4ED8]">"{searchQuery}"</span>
+              {" "}검색 결과 로드맵입니다.
+            </>
+          ) : (
+            "연구 주제의 계층적 구조를 탐색하고 관련 논문을 확인하세요"
+          )}
         </p>
       </div>
 
@@ -643,9 +668,15 @@ function RoadmapFlow({ root, roots }) {
         </div>
         <span className="text-xs text-[#94A3B8] ml-auto">
           생성일:{" "}
-          {new Date(SAMPLE_DATA.generated_at).toLocaleDateString("ko-KR")}
+          {new Date(generatedAt).toLocaleDateString("ko-KR")}
         </span>
       </div>
+
+      {apiError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          {apiError}
+        </div>
+      )}
 
       {/* Graph */}
       <div
@@ -739,12 +770,67 @@ export function RoadmapPreview({ onInit }) {
 
 /* ─── Roadmap Page ─── */
 function Roadmap() {
-  const roots = useMemo(() => parseData(SAMPLE_DATA), []);
+  const { state } = useLocation();
+  const searchQuery = state?.query ?? null;
+  const initialData = resolveRoadmapData(state?.searchResult) ?? SAMPLE_DATA;
+  const [roadmapData, setRoadmapData] = useState(initialData);
+  const [apiError, setApiError] = useState("");
+  const roots = useMemo(() => parseData(roadmapData), [roadmapData]);
   const root = roots[0];
+
+  useEffect(() => {
+    let ignore = false;
+    const stateData = resolveRoadmapData(state?.searchResult);
+
+    if (stateData) {
+      setRoadmapData(stateData);
+      setApiError("");
+      return () => {
+        ignore = true;
+      };
+    }
+
+    async function loadRoadmap() {
+      try {
+        const data = await roadmapApi.getRoadmap(
+          searchQuery ? { keyword: searchQuery } : undefined,
+        );
+        const nextData = resolveRoadmapData(data);
+        if (!ignore && nextData) {
+          setRoadmapData(nextData);
+          setApiError("");
+        }
+      } catch {
+        if (!ignore) {
+          setRoadmapData(SAMPLE_DATA);
+          setApiError("로드맵 API 연결에 실패하여 샘플 데이터를 표시합니다.");
+        }
+      }
+    }
+
+    loadRoadmap();
+    return () => {
+      ignore = true;
+    };
+  }, [searchQuery, state?.searchResult]);
+
+  if (!root) {
+    return (
+      <div className="mx-auto max-w-screen-3xl px-8 py-8 text-sm text-[#64748B]">
+        표시할 로드맵 데이터가 없습니다.
+      </div>
+    );
+  }
 
   return (
     <ReactFlowProvider>
-      <RoadmapFlow root={root} roots={roots} />
+      <RoadmapFlow
+        root={root}
+        roots={roots}
+        searchQuery={searchQuery}
+        generatedAt={roadmapData.generated_at ?? new Date().toISOString()}
+        apiError={apiError}
+      />
     </ReactFlowProvider>
   );
 }
