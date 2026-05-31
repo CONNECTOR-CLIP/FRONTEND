@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { roadmapApi } from "@/api";
+import { roadmapApi, gapApi, paperApi, bookmarksApi } from "@/api";
 import {
   ReactFlow,
   Background,
@@ -411,12 +411,9 @@ function PaperNode({ data }) {
         : "text-red-600 bg-red-50 border-red-200";
 
   return (
-    <a
-      href={`https://arxiv.org/abs/${data.paperId}`}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
       style={{ width: PAPER_W }}
-      className="block bg-white border border-[#E2E8F0] rounded-xl px-3 py-2.5 shadow-sm hover:shadow-md hover:border-[#6366F1]/40 transition-all cursor-pointer"
+      className="bg-white border border-[#E2E8F0] rounded-xl px-3 py-2.5 shadow-sm hover:shadow-md hover:border-[#6366F1]/40 transition-all cursor-pointer"
     >
       <AllHandles />
       <p className="text-[10px] font-mono font-semibold text-[#334155] truncate">
@@ -432,7 +429,7 @@ function PaperNode({ data }) {
           <span className="text-[9px] text-[#94A3B8] italic">re-exp</span>
         )}
       </div>
-    </a>
+    </div>
   );
 }
 
@@ -521,6 +518,7 @@ function buildExpansion(topic, angle) {
         paperId: paper.paper_id,
         score: paper.assignment?.score ?? 0,
         wasReexpressed: paper.assignment?.was_reexpressed ?? false,
+        topicLabel: topic.label,
       },
     });
 
@@ -539,7 +537,7 @@ function buildExpansion(topic, angle) {
 }
 
 /* ─── 공유 상태 훅 (ReactFlowProvider 내부에서만 호출) ─── */
-function useRoadmapFlow(root) {
+function useRoadmapFlow(root, onPaperClick) {
   const { fitView } = useReactFlow();
   const [expandedId, setExpandedId] = useState(null);
 
@@ -559,9 +557,12 @@ function useRoadmapFlow(root) {
   }, [initNodes, initEdges, setNodes, setEdges]);
 
   const onNodeClick = useCallback((_, node) => {
-    if (node.type !== "topicNode") return;
-    setExpandedId((prev) => (prev === node.id ? null : node.id));
-  }, []);
+    if (node.type === "topicNode") {
+      setExpandedId((prev) => (prev === node.id ? null : node.id));
+    } else if (node.type === "paperNode" && onPaperClick) {
+      onPaperClick(node.data.paperId, node.data.topicLabel);
+    }
+  }, [onPaperClick]);
 
   // expandedId 변경 → 노드/엣지 동기화
   useEffect(() => {
@@ -619,12 +620,362 @@ function useRoadmapFlow(root) {
   return { nodes, edges, onNodesChange, onEdgesChange, onNodeClick };
 }
 
+/* ─── Chart colors ─── */
+const CHART_COLORS = [
+  "#F59E0B", "#EAB308", "#EF4444", "#06B6D4",
+  "#8B5CF6", "#10B981", "#3B82F6", "#F97316",
+];
+
+function parseGapContent(content) {
+  if (!content) return [];
+  try {
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.recommendations)) return parsed.recommendations;
+    if (Array.isArray(parsed?.future_work)) return parsed.future_work;
+    if (Array.isArray(parsed?.ideas)) return parsed.ideas;
+  } catch {}
+  return [{ title: "분석 결과", description: content }];
+}
+
+/* ─── 북마크 아이콘 ─── */
+function BookmarkIcon({ filled }) {
+  return filled ? (
+    <svg className="w-4 h-4 text-[#4F46E5]" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M5 3h14a1 1 0 011 1v17.438l-8-3.2-8 3.2V4a1 1 0 011-1z" />
+    </svg>
+  ) : (
+    <svg className="w-4 h-4 text-[#94A3B8] hover:text-[#4F46E5] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 3h14a1 1 0 011 1v17.438l-8-3.2-8 3.2V4a1 1 0 011-1z" />
+    </svg>
+  );
+}
+
+/* ─── 논문 선택 모달 ─── */
+function PaperSelectModal({ papers, selectedIds, onToggle, onConfirm, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-[580px] max-w-[92vw] max-h-[75vh] flex flex-col"
+        style={{ animation: "scaleIn 0.18s ease-out" }}>
+        {/* Header */}
+        <div className="px-6 pt-5 pb-3 border-b border-[#F1F5F9]">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-[#1E293B]">논문선택</h3>
+            <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F1F5F9] transition-colors text-[#94A3B8]">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-xs text-[#64748B] mt-1.5">퓨쳐워크를 탐색할 논문 10~15개를 선택해주세요.</p>
+        </div>
+
+        {/* Paper list */}
+        <div className="flex-1 overflow-y-auto px-4 py-2 paper-scroll">
+          {papers.length === 0 && (
+            <p className="text-xs text-[#94A3B8] text-center py-10">표시할 논문이 없습니다.</p>
+          )}
+          {papers.map((paper) => {
+            const id = paper.paper_id ?? paper.arxiv_id ?? "";
+            const isSelected = selectedIds.has(id);
+            const keywords = (paper.categories ?? paper.arxiv_categories ?? []).slice(0, 4);
+            return (
+              <div
+                key={id}
+                onClick={() => onToggle(id)}
+                className={`flex items-start justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors mb-1 ${
+                  isSelected ? "bg-gray-200/50" : "hover:bg-gray-100/60"
+                }`}
+              >
+                <div className="flex-1 min-w-0 pr-3">
+                  <p className="text-sm font-medium text-[#1E293B] leading-snug truncate">
+                    {paper.title ?? `arXiv:${id}`}
+                  </p>
+                  {keywords.length > 0 && (
+                    <p className="text-xs text-[#64748B] mt-0.5 truncate">{keywords.join(" · ")}</p>
+                  )}
+                </div>
+                <div className="flex-shrink-0 w-5 h-5 mt-0.5">
+                  {isSelected && (
+                    <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-5 pt-3 border-t border-[#F1F5F9] flex justify-end">
+          <button
+            onClick={onConfirm}
+            className="text-sm font-semibold px-5 py-2 rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors"
+          >
+            {selectedIds.size > 0 ? `(${selectedIds.size}) 탐색` : "탐색"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── 주제 상세 모달 ─── */
+function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-[560px] max-w-[92vw] p-6"
+        style={{ animation: "scaleIn 0.18s ease-out" }}>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <h3 className="text-sm font-bold text-[#1E293B] leading-snug">
+            {index + 1}. {item.title ?? item.name ?? "추천 아이디어"}
+          </h3>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={onBookmark} className="p-1">
+              <BookmarkIcon filled={isBookmarked} />
+            </button>
+            <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#F1F5F9] text-[#94A3B8]">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-[#475569] leading-relaxed">
+          {item.description ?? item.content ?? item.rationale ?? "상세 내용이 없습니다."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ─── 논문 사이드 패널 ─── */
+function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, onBookmark, onClose }) {
+  const title = detail?.title ?? null;
+  const topic = detail?.privaryCategory ?? detail?.categories ?? topicLabel ?? null;
+  const summary = detail?.abstracts ?? null;
+  const author = detail?.author ?? null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div
+        className="fixed top-0 right-0 h-full w-[400px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col border-l border-[#E2E8F0]"
+        style={{ animation: "slideInRight 0.25s ease-out" }}
+      >
+        {/* Header */}
+        <div className="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-[#F1F5F9]">
+          <div className="flex-1 min-w-0">
+            {loading ? (
+              <div className="h-4 w-3/4 bg-[#F1F5F9] rounded animate-pulse" />
+            ) : (
+              <h2 className="text-sm font-bold text-[#1E293B] leading-snug">
+                {title ?? `arXiv:${paperId}`}
+              </h2>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+            <button onClick={onBookmark} className="p-1 rounded hover:bg-[#F1F5F9] transition-colors">
+              <BookmarkIcon filled={isBookmarked} />
+            </button>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F1F5F9] transition-colors text-[#94A3B8]"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto paper-scroll px-6 py-5 flex flex-col gap-5">
+          {loading ? (
+            <div className="flex flex-col gap-3">
+              {[100, 80, 60, 90, 70].map((w, i) => (
+                <div key={i} className="h-3 bg-[#F1F5F9] rounded animate-pulse" style={{ width: `${w}%` }} />
+              ))}
+            </div>
+          ) : (
+            <>
+              {/* 토픽 */}
+              {topic && (
+                <div>
+                  <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">토픽</p>
+                  <span className="inline-block text-xs font-medium px-2.5 py-1 rounded-full bg-[#EEF2FF] text-[#4F46E5]">
+                    {topic}
+                  </span>
+                </div>
+              )}
+
+              {/* 저자 */}
+              {author && (
+                <div>
+                  <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">저자</p>
+                  <p className="text-xs text-[#475569]">{author}</p>
+                </div>
+              )}
+
+              {/* 요약 */}
+              {summary ? (
+                <div>
+                  <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">요약</p>
+                  <p className="text-xs text-[#475569] leading-relaxed">{summary}</p>
+                </div>
+              ) : (
+                !loading && (
+                  <p className="text-xs text-[#94A3B8] italic">요약 정보가 없습니다.</p>
+                )
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer — 원 논문 링크 */}
+        <div className="px-6 py-4 border-t border-[#F1F5F9]">
+          <a
+            href={`https://arxiv.org/abs/${paperId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-xs font-semibold text-[#4F46E5] hover:text-[#4338CA] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            원 논문 보기 — arXiv:{paperId}
+          </a>
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ─── Inner Flow (useReactFlow 사용) ─── */
-function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError }) {
+function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }) {
+  /* ── 논문 사이드 패널 상태 ── */
+  const [selectedPaper, setSelectedPaper] = useState(null); // { paperId, topicLabel }
+  const [paperDetail, setPaperDetail] = useState(null);
+  const [paperLoading, setPaperLoading] = useState(false);
+  const [paperBookmarked, setPaperBookmarked] = useState(new Set());
+
+  const handlePaperClick = useCallback(async (paperId, topicLabel) => {
+    setSelectedPaper({ paperId, topicLabel });
+    setPaperDetail(null);
+    setPaperLoading(true);
+    try {
+      const detail = await paperApi.getPaperDetail(paperId);
+      setPaperDetail(detail);
+    } catch {
+      setPaperDetail({ paperId });
+    } finally {
+      setPaperLoading(false);
+    }
+  }, []);
+
+  const togglePaperBookmark = useCallback(async (paperId) => {
+    const isBookmarked = paperBookmarked.has(paperId);
+    setPaperBookmarked((prev) => {
+      const next = new Set(prev);
+      isBookmarked ? next.delete(paperId) : next.add(paperId);
+      return next;
+    });
+    try {
+      if (isBookmarked) {
+        await bookmarksApi.removePaperBookmark(paperId);
+      } else {
+        await bookmarksApi.addPaperBookmark({ paperId });
+      }
+    } catch {
+      setPaperBookmarked((prev) => {
+        const next = new Set(prev);
+        isBookmarked ? next.add(paperId) : next.delete(paperId);
+        return next;
+      });
+    }
+  }, [paperBookmarked]);
+
   const { nodes, edges, onNodesChange, onEdgesChange, onNodeClick } =
-    useRoadmapFlow(root);
+    useRoadmapFlow(root, handlePaperClick);
 
   const totalPapers = root.topics.reduce((s, t) => s + t.papers.length, 0);
+
+  /* ── 점유율 데이터 ── */
+  const distribution = useMemo(
+    () =>
+      root.topics
+        .map((t, i) => ({
+          label: t.label,
+          count: t.papers.length,
+          color: CHART_COLORS[i % CHART_COLORS.length],
+        }))
+        .filter((d) => d.count > 0),
+    [root]
+  );
+  const distTotal = distribution.reduce((s, d) => s + d.count, 0);
+  const distMax = Math.max(...distribution.map((d) => d.count), 1);
+
+  /* ── GAP 상태 ── */
+  const [gapItems, setGapItems] = useState([]);
+  const [gapLoading, setGapLoading] = useState(false);
+  const [gapError, setGapError] = useState("");
+  const [bookmarked, setBookmarked] = useState(new Set());
+  const [showPaperModal, setShowPaperModal] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [detailItem, setDetailItem] = useState(null);
+
+  const togglePaper = useCallback((id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  const runGapAnalysis = useCallback(async (ids) => {
+    const paperIds = [...ids];
+    setShowPaperModal(false);
+    setGapLoading(true);
+    setGapError("");
+    setGapItems([]);
+    try {
+      const result = await gapApi.refreshRecommendations({ paperIds });
+      setGapItems(parseGapContent(result?.gapContent ?? result));
+    } catch {
+      setGapError("GAP 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setGapLoading(false);
+    }
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    if (!selectedIds.size) return;
+    runGapAnalysis(selectedIds);
+  }, [selectedIds, runGapAnalysis]);
+
+  const toggleBookmark = useCallback((i) => {
+    setBookmarked((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+  }, []);
+
+  /* 기존 GAP 결과 불러오기 */
+  useEffect(() => {
+    let ignore = false;
+    gapApi.getResult()
+      .then((result) => {
+        if (ignore) return;
+        const items = parseGapContent(result?.gapContent ?? result);
+        if (items.length) setGapItems(items);
+      })
+      .catch(() => {});
+    return () => { ignore = true; };
+  }, []);
 
   return (
     <div className="mx-auto max-w-screen-3xl px-8 py-8 flex flex-col gap-6">
@@ -681,7 +1032,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError }) {
       {/* Graph */}
       <div
         className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden"
-        style={{ height: "calc(100vh - 260px)", minHeight: "600px" }}
+        style={{ height: "calc(100vh - 260px)", minHeight: "500px" }}
       >
         <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#F1F5F9]">
           <div className="flex items-center gap-2">
@@ -725,6 +1076,162 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError }) {
           </ReactFlow>
         </div>
       </div>
+      {/* ─── 점유율 + GAP 추천 ─── */}
+      <div className="flex gap-6">
+        {/* 점유율 */}
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6" style={{ flex: "0 0 44%" }}>
+          <h3 className="text-sm font-semibold text-[#1E293B] mb-5">해당 계층까지의 점유율</h3>
+          <div className="flex items-end justify-center gap-5 h-36 mb-4">
+            {distribution.map((d) => (
+              <div key={d.label} className="flex flex-col items-center gap-1">
+                <span className="text-xs font-semibold text-[#334155]">{d.count}</span>
+                <div
+                  style={{
+                    height: `${Math.max((d.count / distMax) * 112, 8)}px`,
+                    backgroundColor: d.color,
+                    width: "48px",
+                    borderRadius: "4px 4px 0 0",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-[#F1F5F9] pt-3">
+            <p className="text-xs text-[#64748B]">
+              총 집계된 논문 수:{" "}
+              <span className="font-bold text-[#3B82F6]">{distTotal}</span>
+            </p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+              {distribution.map((d) => (
+                <div key={d.label} className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                  <span className="text-xs text-[#64748B]">{d.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* CLIP 추천 아이디어 */}
+        <div className="flex-1 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-[#1E293B]">CLIP의 추천 아이디어</h3>
+            {gapItems.length > 0 && (
+              <button
+                onClick={() => setShowPaperModal(true)}
+                disabled={gapLoading}
+                className="text-xs px-3 py-1.5 rounded-full bg-[#EEF2FF] text-[#4F46E5] font-medium hover:bg-[#E0E7FF] transition-colors disabled:opacity-50"
+              >
+                주제 재추천
+              </button>
+            )}
+          </div>
+
+          {/* 기본 상태 */}
+          {!gapLoading && !gapItems.length && !gapError && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-6">
+              <p className="text-sm font-medium text-[#334155]">논문을 선택하여 퓨쳐워크를 탐색해보세요.</p>
+              <p className="text-xs text-[#94A3B8] text-center leading-relaxed">
+                논문을 10~15개 선택하면<br />연구 방향 아이디어 5개를 추천해드립니다.
+              </p>
+              <div className="mt-4">
+                <button
+                  onClick={() => setShowPaperModal(true)}
+                  className="text-sm font-semibold px-6 py-2.5 rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors"
+                >
+                  탐색하기
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 로딩 */}
+          {gapLoading && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3">
+              <div className="w-6 h-6 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-[#94A3B8]">퓨쳐워크 아이디어를 분석하는 중입니다...</p>
+            </div>
+          )}
+
+          {/* 에러 */}
+          {gapError && !gapLoading && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3">
+              <p className="text-xs text-red-500">{gapError}</p>
+              <button
+                onClick={() => setShowPaperModal(true)}
+                className="text-xs px-4 py-2 rounded-lg bg-[#EEF2FF] text-[#4F46E5] font-medium hover:bg-[#E0E7FF] transition-colors"
+              >
+                다시 탐색하기
+              </button>
+            </div>
+          )}
+
+          {/* 결과 */}
+          {!gapLoading && gapItems.length > 0 && (
+            <div className="flex flex-col gap-2.5 overflow-y-auto paper-scroll" style={{ maxHeight: "280px" }}>
+              {gapItems.map((item, i) => (
+                <div
+                  key={i}
+                  onClick={() => setDetailItem({ item, index: i })}
+                  className="rounded-xl border border-[#E2E8F0] px-4 py-3 cursor-pointer hover:border-[#C7D2FE] hover:bg-[#FAFAFF] transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#1E293B] truncate">
+                        {i + 1}. {item.title ?? item.name ?? "추천 아이디어"}
+                      </p>
+                      <p className="text-xs text-[#64748B] mt-1 line-clamp-1">
+                        {item.description ?? item.content ?? ""}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleBookmark(i); }}
+                      className="flex-shrink-0 p-0.5 mt-0.5"
+                    >
+                      <BookmarkIcon filled={bookmarked.has(i)} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 논문 선택 모달 */}
+      {showPaperModal && (
+        <PaperSelectModal
+          papers={papers}
+          selectedIds={selectedIds}
+          onToggle={togglePaper}
+          onConfirm={handleConfirm}
+          onClose={() => setShowPaperModal(false)}
+        />
+      )}
+
+      {/* 주제 상세 모달 */}
+      {detailItem && (
+        <TopicDetailModal
+          item={detailItem.item}
+          index={detailItem.index}
+          isBookmarked={bookmarked.has(detailItem.index)}
+          onBookmark={() => toggleBookmark(detailItem.index)}
+          onClose={() => setDetailItem(null)}
+        />
+      )}
+
+      {/* 논문 사이드 패널 */}
+      {selectedPaper && (
+        <PaperSidePanel
+          paperId={selectedPaper.paperId}
+          topicLabel={selectedPaper.topicLabel}
+          detail={paperDetail}
+          loading={paperLoading}
+          isBookmarked={paperBookmarked.has(selectedPaper.paperId)}
+          onBookmark={() => togglePaperBookmark(selectedPaper.paperId)}
+          onClose={() => setSelectedPaper(null)}
+        />
+      )}
     </div>
   );
 }
@@ -778,6 +1285,23 @@ function Roadmap() {
   const roots = useMemo(() => parseData(roadmapData), [roadmapData]);
   const root = roots[0];
 
+  const papers = useMemo(() => {
+    const seen = new Set();
+    const list = [];
+    for (const r of (roadmapData?.roots ?? [])) {
+      for (const node of (r.intermediate_nodes ?? [])) {
+        for (const child of (node.children ?? [])) {
+          const id = child.paper_id;
+          if (id && !seen.has(id)) {
+            seen.add(id);
+            list.push({ paper_id: id });
+          }
+        }
+      }
+    }
+    return list;
+  }, [roadmapData]);
+
   useEffect(() => {
     let ignore = false;
     const stateData = resolveRoadmapData(state?.searchResult);
@@ -830,6 +1354,7 @@ function Roadmap() {
         searchQuery={searchQuery}
         generatedAt={roadmapData.generated_at ?? new Date().toISOString()}
         apiError={apiError}
+        papers={papers}
       />
     </ReactFlowProvider>
   );
