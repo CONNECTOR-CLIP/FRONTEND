@@ -44,8 +44,8 @@ function SignupPage() {
       return "";
     },
     password: (v) => {
-      if (v.length < 5 || !/[!@#$%^&*(),.?":{}|<>_\-]/.test(v))
-        return "최소 길이 5, 특수문자 1개를 포함해주세요.";
+      if (v.length < 8 || v.length > 20 || !/[!@#$%^&*(),.?":{}|<>_\-]/.test(v))
+        return "8~20자, 특수문자 1개를 포함해주세요.";
       return "";
     },
     passwordConfirm: (v, f) => {
@@ -104,7 +104,7 @@ function SignupPage() {
     setIsSubmitting(true);
     try {
       await authApi.signup({
-        id: form.id,
+        userId: form.id,
         password: form.password,
         nickname: form.nickname,
         email: form.email,

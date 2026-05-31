@@ -1,9 +1,9 @@
 import api, { unwrap } from "./client";
 
 export const analysisApi = {
-  getDistribution: (params) =>
-    unwrap(api.get("/api/analysis/distribution", { params })),
-  analyzeGap: (payload) => unwrap(api.post("/api/analysis", payload)),
+  getDistribution: (payload) =>
+    unwrap(api.post("/api/analysis/distribution", payload)),
+  analyzeGap: (payload) => unwrap(api.post("/api/gap", payload)),
 };
 
 export const getAnalysisDistribution = analysisApi.getDistribution;

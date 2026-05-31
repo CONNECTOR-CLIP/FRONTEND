@@ -46,14 +46,14 @@ function LoginModal({ onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.email.trim() || !form.password) {
-      setError("이메일과 비밀번호를 입력해주세요.");
+      setError("아이디와 비밀번호를 입력해주세요.");
       return;
     }
 
     setIsSubmitting(true);
     try {
       const data = await authApi.login({
-        email: form.email.trim(),
+        userId: form.email.trim(),
         password: form.password,
       });
       const token = getToken(data);
@@ -86,13 +86,13 @@ function LoginModal({ onClose }) {
           <p className="text-[15px]  font-bold">다시 만나 반가워요.</p>
           <div className="flex flex-col gap-1">
             <label className="text-regular font-medium text-[12px] text-gray-700">
-              이메일
+              아이디
             </label>
             <input
-              type="email"
+              type="text"
               value={form.email}
               onChange={(e) => handleChange("email", e.target.value)}
-              placeholder="email@example.com"
+              placeholder="아이디를 입력해주세요"
               className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-[#0060AD] focus:ring-1 focus:ring-[#0060AD]"
             />
           </div>

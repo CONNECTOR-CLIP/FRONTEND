@@ -11,3 +11,6 @@ dist/
 layout-compare.html
 login-compare.html
 roadmap-compare.html
+repomix-output.xml
+.env.production
+*poster
