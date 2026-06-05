@@ -312,8 +312,8 @@ const ROOT_W = 120;
 const ROOT_H = 120;
 const TOPIC_W = 156;
 const TOPIC_H = 40;
-const PAPER_W = 148;
-const PAPER_H = 56;
+const PAPER_W = 160;
+const PAPER_H = 72;
 const TOPIC_RADIUS = 350;
 const SPREAD_ANGLE = Math.PI * 1.2; // 216° 부채꼴
 
@@ -416,19 +416,27 @@ function PaperNode({ data }) {
       className="bg-white border border-[#E2E8F0] rounded-xl px-3 py-2.5 shadow-sm hover:shadow-md hover:border-[#6366F1]/40 transition-all cursor-pointer"
     >
       <AllHandles />
-      <p className="text-[10px] font-mono font-semibold text-[#334155] truncate">
-        arXiv:{data.paperId}
-      </p>
-      <div className="flex items-center gap-1.5 mt-1">
-        <span
-          className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${scoreStyle}`}
-        >
-          {score.toFixed(1)}
-        </span>
-        {data.wasReexpressed && (
-          <span className="text-[9px] text-[#94A3B8] italic">re-exp</span>
-        )}
-      </div>
+      {data.title ? (
+        <p className="text-[10px] font-medium text-[#1E293B] leading-snug line-clamp-2">
+          {data.title}
+        </p>
+      ) : (
+        <p className="text-[10px] font-mono font-semibold text-[#334155] truncate">
+          arXiv:{data.paperId}
+        </p>
+      )}
+      {score > 0.1 && (
+        <div className="flex items-center gap-1.5 mt-1">
+          <span
+            className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${scoreStyle}`}
+          >
+            {score.toFixed(1)}
+          </span>
+          {data.wasReexpressed && (
+            <span className="text-[9px] text-[#94A3B8] italic">re-exp</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -489,7 +497,7 @@ function buildInitialGraph(root) {
 }
 
 /* ─── Topic 클릭 시 paper 노드/엣지 생성 ─── */
-function buildExpansion(topic, angle) {
+function buildExpansion(topic, angle, paperMap = {}) {
   const papers = topic.papers;
   if (!papers.length) return { nodes: [], edges: [] };
 
@@ -509,6 +517,7 @@ function buildExpansion(topic, angle) {
     const px = tx + Math.cos(paperAngle) * paperRadius;
     const py = ty + Math.sin(paperAngle) * paperRadius;
     const id = `paper-${paper.paper_id}`;
+    const localData = paperMap[paper.paper_id];
 
     nodes.push({
       id,
@@ -516,6 +525,7 @@ function buildExpansion(topic, angle) {
       position: { x: px - PAPER_W / 2, y: py - PAPER_H / 2 },
       data: {
         paperId: paper.paper_id,
+        title: localData?.title ?? null,
         score: paper.assignment?.score ?? 0,
         wasReexpressed: paper.assignment?.was_reexpressed ?? false,
         topicLabel: topic.label,
@@ -537,7 +547,7 @@ function buildExpansion(topic, angle) {
 }
 
 /* ─── 공유 상태 훅 (ReactFlowProvider 내부에서만 호출) ─── */
-function useRoadmapFlow(root, onPaperClick) {
+function useRoadmapFlow(root, onPaperClick, paperMap = {}) {
   const { fitView } = useReactFlow();
   const [expandedId, setExpandedId] = useState(null);
 
@@ -570,7 +580,7 @@ function useRoadmapFlow(root, onPaperClick) {
       ? root.topics.find((t) => t.id === expandedId)
       : null;
     const expansion = topic
-      ? buildExpansion(topic, topicAngles[expandedId])
+      ? buildExpansion(topic, topicAngles[expandedId], paperMap)
       : { nodes: [], edges: [] };
 
     setNodes((nds) => [
@@ -628,13 +638,28 @@ const CHART_COLORS = [
 
 function parseGapContent(content) {
   if (!content) return [];
-  try {
-    const parsed = JSON.parse(content);
-    if (Array.isArray(parsed)) return parsed;
-    if (Array.isArray(parsed?.recommendations)) return parsed.recommendations;
-    if (Array.isArray(parsed?.future_work)) return parsed.future_work;
-    if (Array.isArray(parsed?.ideas)) return parsed.ideas;
-  } catch {}
+  const tryParse = (val) => {
+    if (typeof val !== "string") return val;
+    try { return JSON.parse(val); } catch { return null; }
+  };
+  const parsed = tryParse(content);
+  if (!parsed) return [{ title: "분석 결과", description: content }];
+
+  const normalise = (item) => ({
+    title: item.title ?? item.proposed_direction?.slice(0, 60) ?? `제안 ${item.id ?? ""}`,
+    description: item.description ?? "",
+    backgroundAndGap: item.background_and_gap ?? null,
+    proposedDirection: item.proposed_direction ?? null,
+    expectedContribution: item.expected_contribution ?? null,
+    referencePapers: item.reference_papers ?? [],
+    noveltyAssessment: item.novelty_assessment ?? null,
+  });
+
+  if (Array.isArray(parsed)) return parsed.map(normalise);
+  if (Array.isArray(parsed?.future_work_proposals)) return parsed.future_work_proposals.map(normalise);
+  if (Array.isArray(parsed?.future_work)) return parsed.future_work.map(normalise);
+  if (Array.isArray(parsed?.recommendations)) return parsed.recommendations.map(normalise);
+  if (Array.isArray(parsed?.ideas)) return parsed.ideas.map(normalise);
   return [{ title: "분석 결과", description: content }];
 }
 
@@ -724,16 +749,36 @@ function PaperSelectModal({ papers, selectedIds, onToggle, onConfirm, onClose })
 
 /* ─── 주제 상세 모달 ─── */
 function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
+  const sections = item.backgroundAndGap || item.proposedDirection || item.expectedContribution
+    ? [
+        { label: "연구 공백", text: item.backgroundAndGap },
+        { label: "제안 방향", text: item.proposedDirection },
+        { label: "기대 기여", text: item.expectedContribution },
+      ]
+    : null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-[560px] max-w-[92vw] p-6"
+      <div className="relative bg-white rounded-2xl shadow-2xl w-[580px] max-w-[92vw] p-6 max-h-[80vh] overflow-y-auto"
         style={{ animation: "scaleIn 0.18s ease-out" }}>
         <div className="flex items-start justify-between gap-3 mb-4">
-          <h3 className="text-sm font-bold text-[#1E293B] leading-snug">
-            {index + 1}. {item.title ?? item.name ?? "추천 아이디어"}
-          </h3>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-[#1E293B] leading-snug">
+              연구 제안 {index + 1}
+            </h3>
+            {item.referencePapers?.length > 0 && (
+              <p className="text-[11px] text-[#6366F1] mt-1">
+                참조: {item.referencePapers.join(", ")}
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {item.noveltyAssessment && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669]">
+                {item.noveltyAssessment}
+              </span>
+            )}
             <button onClick={onBookmark} className="p-1">
               <BookmarkIcon filled={isBookmarked} />
             </button>
@@ -744,9 +789,20 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
             </button>
           </div>
         </div>
-        <p className="text-xs text-[#475569] leading-relaxed">
-          {item.description ?? item.content ?? item.rationale ?? "상세 내용이 없습니다."}
-        </p>
+        {sections ? (
+          <div className="flex flex-col gap-3">
+            {sections.filter(s => s.text).map((s) => (
+              <div key={s.label}>
+                <p className="text-[11px] font-semibold text-[#6366F1] mb-1">{s.label}</p>
+                <p className="text-xs text-[#475569] leading-relaxed">{s.text}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-[#475569] leading-relaxed">
+            {item.description ?? item.content ?? "상세 내용이 없습니다."}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -856,6 +912,16 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
 
 /* ─── Inner Flow (useReactFlow 사용) ─── */
 function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }) {
+  /* ── paperMap: paper_id → 검색결과 전체 데이터 ── */
+  const paperMap = useMemo(() => {
+    const map = {};
+    for (const p of papers) {
+      const id = p.paper_id ?? p.arxiv_id ?? "";
+      if (id) map[id] = p;
+    }
+    return map;
+  }, [papers]);
+
   /* ── 논문 사이드 패널 상태 ── */
   const [selectedPaper, setSelectedPaper] = useState(null); // { paperId, topicLabel }
   const [paperDetail, setPaperDetail] = useState(null);
@@ -870,11 +936,19 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
       const detail = await paperApi.getPaperDetail(paperId);
       setPaperDetail(detail);
     } catch {
-      setPaperDetail({ paperId });
+      const local = paperMap[paperId];
+      setPaperDetail(local ? {
+        paperId,
+        title: local.title,
+        abstracts: local.abstract,
+        author: Array.isArray(local.authors) ? local.authors.join(", ") : (local.submitter ?? null),
+        categories: Array.isArray(local.categories) ? local.categories.join(", ") : local.categories,
+        privaryCategory: local.primary_category ?? (Array.isArray(local.categories) ? local.categories[0] : null),
+      } : { paperId });
     } finally {
       setPaperLoading(false);
     }
-  }, []);
+  }, [paperMap]);
 
   const togglePaperBookmark = useCallback(async (paperId) => {
     const isBookmarked = paperBookmarked.has(paperId);
@@ -899,7 +973,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   }, [paperBookmarked]);
 
   const { nodes, edges, onNodesChange, onEdgesChange, onNodeClick } =
-    useRoadmapFlow(root, handlePaperClick);
+    useRoadmapFlow(root, handlePaperClick, paperMap);
 
   const totalPapers = root.topics.reduce((s, t) => s + t.papers.length, 0);
 
@@ -942,6 +1016,10 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
     setGapError("");
     setGapItems([]);
     try {
+      const selectedPapers = papers.filter((p) => ids.has(p.paper_id ?? p.arxiv_id ?? ""));
+      if (selectedPapers.length > 0) {
+        await paperApi.selectPapers(selectedPapers).catch(() => {});
+      }
       const result = await gapApi.refreshRecommendations({ paperIds });
       setGapItems(parseGapContent(result?.gapContent ?? result));
     } catch {
@@ -949,7 +1027,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
     } finally {
       setGapLoading(false);
     }
-  }, []);
+  }, [papers]);
 
   const handleConfirm = useCallback(() => {
     if (!selectedIds.size) return;
@@ -965,17 +1043,6 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   }, []);
 
   /* 기존 GAP 결과 불러오기 */
-  useEffect(() => {
-    let ignore = false;
-    gapApi.getResult()
-      .then((result) => {
-        if (ignore) return;
-        const items = parseGapContent(result?.gapContent ?? result);
-        if (items.length) setGapItems(items);
-      })
-      .catch(() => {});
-    return () => { ignore = true; };
-  }, []);
 
   return (
     <div className="mx-auto max-w-screen-3xl px-8 py-8 flex flex-col gap-6">
@@ -1130,16 +1197,12 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           {/* 기본 상태 */}
           {!gapLoading && !gapItems.length && !gapError && (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-6">
-              <p className="text-sm font-medium text-[#334155]">논문을 선택하여 퓨쳐워크를 탐색해보세요.</p>
-              <p className="text-xs text-[#94A3B8] text-center leading-relaxed">
-                논문을 10~15개 선택하면<br />연구 방향 아이디어 5개를 추천해드립니다.
-              </p>
-              <div className="mt-4">
+              <div className="mt-2">
                 <button
                   onClick={() => setShowPaperModal(true)}
                   className="text-sm font-semibold px-6 py-2.5 rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors"
                 >
-                  탐색하기
+                  논문들을 선택하여 퓨처워크를 탐색하세요
                 </button>
               </div>
             </div>
@@ -1181,7 +1244,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
                         {i + 1}. {item.title ?? item.name ?? "추천 아이디어"}
                       </p>
                       <p className="text-xs text-[#64748B] mt-1 line-clamp-1">
-                        {item.description ?? item.content ?? ""}
+                        {item.backgroundAndGap ?? item.description ?? item.content ?? ""}
                       </p>
                     </div>
                     <button
@@ -1283,9 +1346,20 @@ function Roadmap() {
   const [roadmapData, setRoadmapData] = useState(initialData);
   const [apiError, setApiError] = useState("");
   const roots = useMemo(() => parseData(roadmapData), [roadmapData]);
-  const root = roots[0];
+  const root = useMemo(() => {
+    if (roots.length <= 1) return roots[0] ?? null;
+    return {
+      id: roots[0].id,
+      label: roots[0].label,
+      topics: roots.flatMap((r) =>
+        r.topics.map((t) => ({ ...t, label: r.id }))
+      ),
+    };
+  }, [roots]);
 
   const papers = useMemo(() => {
+    const searchPapers = state?.searchResult?.papers;
+    if (searchPapers?.length > 0) return searchPapers;
     const seen = new Set();
     const list = [];
     for (const r of (roadmapData?.roots ?? [])) {
@@ -1300,7 +1374,7 @@ function Roadmap() {
       }
     }
     return list;
-  }, [roadmapData]);
+  }, [roadmapData, state?.searchResult?.papers]);
 
   useEffect(() => {
     let ignore = false;
