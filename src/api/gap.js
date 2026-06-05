@@ -3,7 +3,7 @@ import api, { unwrap } from "./client";
 export const gapApi = {
   getResult: (params) => unwrap(api.get("/api/result", { params })),
   refreshRecommendations: (payload) =>
-    unwrap(api.post("/api/gap/refresh", payload)),
+    unwrap(api.post("/api/gap/refresh", payload, { timeout: 0 })),
   getGapDetail: (id) => unwrap(api.get(`/api/gap/${encodeURIComponent(id)}`)),
 };
 
