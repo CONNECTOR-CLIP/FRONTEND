@@ -748,9 +748,7 @@ function PaperSelectModal({ papers, selectedIds, onToggle, onConfirm, onClose })
 }
 
 /* ─── 주제 상세 모달 ─── */
-function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose, onGenerateDraft }) {
-  const [draftLoading, setDraftLoading] = useState(false);
-
+function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
   const sections = item.backgroundAndGap || item.proposedDirection || item.expectedContribution
     ? [
         { label: "연구 공백", text: item.backgroundAndGap },
@@ -758,12 +756,6 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose, onGe
         { label: "기대 기여", text: item.expectedContribution },
       ]
     : null;
-
-  const handleDraft = async () => {
-    setDraftLoading(true);
-    await onGenerateDraft(item);
-    setDraftLoading(false);
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -811,62 +803,6 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose, onGe
             {item.description ?? item.content ?? "상세 내용이 없습니다."}
           </p>
         )}
-        <div className="mt-5 pt-4 border-t border-[#F1F5F9]">
-          <button
-            onClick={handleDraft}
-            disabled={draftLoading}
-            className="w-full flex items-center justify-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors disabled:opacity-60"
-          >
-            {draftLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                논문 초안 생성 중...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                이 주제로 논문 초안 생성
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── 논문 초안 모달 ─── */
-function PaperDraftModal({ draft, onClose }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div
-        className="relative bg-white rounded-2xl shadow-2xl w-[700px] max-w-[94vw] flex flex-col"
-        style={{ maxHeight: "85vh", animation: "scaleIn 0.18s ease-out" }}
-      >
-        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#F1F5F9]">
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-[#16A34A]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h3 className="text-sm font-bold text-[#1E293B]">논문 초안</h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F1F5F9] text-[#94A3B8]"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto paper-scroll px-6 py-5">
-          <pre className="text-xs text-[#334155] leading-relaxed whitespace-pre-wrap font-sans">
-            {draft}
-          </pre>
-        </div>
       </div>
     </div>
   );
@@ -1064,9 +1000,6 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   const [showPaperModal, setShowPaperModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [detailItem, setDetailItem] = useState(null);
-  const [paperDraft, setPaperDraft] = useState("");
-  const [showDraftModal, setShowDraftModal] = useState(false);
-  const [draftError, setDraftError] = useState("");
 
   const togglePaper = useCallback((id) => {
     setSelectedIds((prev) => {
@@ -1107,24 +1040,6 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
       next.has(i) ? next.delete(i) : next.add(i);
       return next;
     });
-  }, []);
-
-  const handleGenerateDraft = useCallback(async (item) => {
-    setDraftError("");
-    try {
-      const proposal = {
-        background_and_gap: item.backgroundAndGap ?? "",
-        proposed_direction: item.proposedDirection ?? "",
-        expected_contribution: item.expectedContribution ?? "",
-        reference_papers: item.referencePapers ?? [],
-      };
-      const result = await gapApi.generateDraft(proposal);
-      setPaperDraft(result?.paperDraft ?? result?.paper_draft ?? "");
-      setDetailItem(null);
-      setShowDraftModal(true);
-    } catch {
-      setDraftError("논문 초안 생성에 실패했습니다.");
-    }
   }, []);
 
   /* 기존 GAP 결과 불러오기 */
@@ -1365,21 +1280,6 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           isBookmarked={bookmarked.has(detailItem.index)}
           onBookmark={() => toggleBookmark(detailItem.index)}
           onClose={() => setDetailItem(null)}
-          onGenerateDraft={handleGenerateDraft}
-        />
-      )}
-
-      {draftError && !showDraftModal && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-600 text-xs font-medium px-4 py-2 rounded-xl shadow">
-          {draftError}
-        </div>
-      )}
-
-      {/* 논문 초안 모달 */}
-      {showDraftModal && paperDraft && (
-        <PaperDraftModal
-          draft={paperDraft}
-          onClose={() => setShowDraftModal(false)}
         />
       )}
 
