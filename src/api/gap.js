@@ -5,6 +5,8 @@ export const gapApi = {
   refreshRecommendations: (payload) =>
     unwrap(api.post("/api/gap/refresh", payload, { timeout: 0 })),
   getGapDetail: (id) => unwrap(api.get(`/api/gap/${encodeURIComponent(id)}`)),
+  generateDraft: (proposal) =>
+    unwrap(api.post("/api/gap/draft", { proposal }, { timeout: 0 })),
 };
 
 export const getGapResult = gapApi.getResult;

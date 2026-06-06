@@ -748,7 +748,9 @@ function PaperSelectModal({ papers, selectedIds, onToggle, onConfirm, onClose })
 }
 
 /* ─── 주제 상세 모달 ─── */
-function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
+function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose, onGenerateDraft }) {
+  const [draftLoading, setDraftLoading] = useState(false);
+
   const sections = item.backgroundAndGap || item.proposedDirection || item.expectedContribution
     ? [
         { label: "연구 공백", text: item.backgroundAndGap },
@@ -756,6 +758,12 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
         { label: "기대 기여", text: item.expectedContribution },
       ]
     : null;
+
+  const handleDraft = async () => {
+    setDraftLoading(true);
+    await onGenerateDraft(item);
+    setDraftLoading(false);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -803,6 +811,27 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
             {item.description ?? item.content ?? "상세 내용이 없습니다."}
           </p>
         )}
+        <div className="mt-5 pt-4 border-t border-[#F1F5F9]">
+          <button
+            onClick={handleDraft}
+            disabled={draftLoading}
+            className="w-full flex items-center justify-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors disabled:opacity-60"
+          >
+            {draftLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                논문 초안 생성 중...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                이 주제로 논문 초안 생성
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1037,6 +1066,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   const [detailItem, setDetailItem] = useState(null);
   const [paperDraft, setPaperDraft] = useState("");
   const [showDraftModal, setShowDraftModal] = useState(false);
+  const [draftError, setDraftError] = useState("");
 
   const togglePaper = useCallback((id) => {
     setSelectedIds((prev) => {
@@ -1058,14 +1088,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
         await paperApi.selectPapers(selectedPapers).catch(() => {});
       }
       const result = await gapApi.refreshRecommendations({ paperIds });
-      const content = result?.gapContent ?? result;
-      setGapItems(parseGapContent(content));
-      try {
-        const parsed = typeof content === "string" ? JSON.parse(content) : content;
-        setPaperDraft(parsed?.paper_draft ?? "");
-      } catch {
-        setPaperDraft("");
-      }
+      setGapItems(parseGapContent(result?.gapContent ?? result));
     } catch {
       setGapError("GAP 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
@@ -1084,6 +1107,24 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
       next.has(i) ? next.delete(i) : next.add(i);
       return next;
     });
+  }, []);
+
+  const handleGenerateDraft = useCallback(async (item) => {
+    setDraftError("");
+    try {
+      const proposal = {
+        background_and_gap: item.backgroundAndGap ?? "",
+        proposed_direction: item.proposedDirection ?? "",
+        expected_contribution: item.expectedContribution ?? "",
+        reference_papers: item.referencePapers ?? [],
+      };
+      const result = await gapApi.generateDraft(proposal);
+      setPaperDraft(result?.paperDraft ?? result?.paper_draft ?? "");
+      setDetailItem(null);
+      setShowDraftModal(true);
+    } catch {
+      setDraftError("논문 초안 생성에 실패했습니다.");
+    }
   }, []);
 
   /* 기존 GAP 결과 불러오기 */
@@ -1275,47 +1316,32 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
 
           {/* 결과 */}
           {!gapLoading && gapItems.length > 0 && (
-            <>
-              <div className="flex flex-col gap-2.5 overflow-y-auto paper-scroll" style={{ maxHeight: "240px" }}>
-                {gapItems.map((item, i) => (
-                  <div
-                    key={i}
-                    onClick={() => setDetailItem({ item, index: i })}
-                    className="rounded-xl border border-[#E2E8F0] px-4 py-3 cursor-pointer hover:border-[#C7D2FE] hover:bg-[#FAFAFF] transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[#1E293B] truncate">
-                          {i + 1}. {item.title ?? item.name ?? "추천 아이디어"}
-                        </p>
-                        <p className="text-xs text-[#64748B] mt-1 line-clamp-1">
-                          {item.backgroundAndGap ?? item.description ?? item.content ?? ""}
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleBookmark(i); }}
-                        className="flex-shrink-0 p-0.5 mt-0.5"
-                      >
-                        <BookmarkIcon filled={bookmarked.has(i)} />
-                      </button>
+            <div className="flex flex-col gap-2.5 overflow-y-auto paper-scroll" style={{ maxHeight: "280px" }}>
+              {gapItems.map((item, i) => (
+                <div
+                  key={i}
+                  onClick={() => setDetailItem({ item, index: i })}
+                  className="rounded-xl border border-[#E2E8F0] px-4 py-3 cursor-pointer hover:border-[#C7D2FE] hover:bg-[#FAFAFF] transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#1E293B] truncate">
+                        {i + 1}. {item.title ?? item.name ?? "추천 아이디어"}
+                      </p>
+                      <p className="text-xs text-[#64748B] mt-1 line-clamp-1">
+                        {item.backgroundAndGap ?? item.description ?? item.content ?? ""}
+                      </p>
                     </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleBookmark(i); }}
+                      className="flex-shrink-0 p-0.5 mt-0.5"
+                    >
+                      <BookmarkIcon filled={bookmarked.has(i)} />
+                    </button>
                   </div>
-                ))}
-              </div>
-              {paperDraft && (
-                <div className="pt-2 border-t border-[#F1F5F9]">
-                  <button
-                    onClick={() => setShowDraftModal(true)}
-                    className="w-full text-xs font-semibold px-4 py-2 rounded-xl bg-[#F0FDF4] text-[#16A34A] hover:bg-[#DCFCE7] transition-colors text-left flex items-center gap-2"
-                  >
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    논문 초안 보기 (가장 유망한 아이디어)
-                  </button>
                 </div>
-              )}
-            </>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -1339,7 +1365,14 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           isBookmarked={bookmarked.has(detailItem.index)}
           onBookmark={() => toggleBookmark(detailItem.index)}
           onClose={() => setDetailItem(null)}
+          onGenerateDraft={handleGenerateDraft}
         />
+      )}
+
+      {draftError && !showDraftModal && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-600 text-xs font-medium px-4 py-2 rounded-xl shadow">
+          {draftError}
+        </div>
       )}
 
       {/* 논문 초안 모달 */}
