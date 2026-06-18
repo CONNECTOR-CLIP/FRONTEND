@@ -116,16 +116,26 @@ function SearchHistory() {
     (r) => !trimmed || r.query.toLowerCase().includes(trimmed.toLowerCase())
   );
 
-  const removeRecent = (id) => {
+  const removeRecent = async (id) => {
     const next = recents.filter((r) => r.id !== id);
     setRecents(next);
     saveRecent(next);
+    try {
+      await historyApi.deleteHistory(id);
+    } catch {
+      // 서버 삭제 실패해도 UI는 유지
+    }
   };
 
-  const clearAll = () => {
+  const clearAll = async () => {
     setRecents([]);
     saveRecent([]);
     setFilterQuery("");
+    try {
+      await historyApi.clearHistory();
+    } catch {
+      // 서버 삭제 실패해도 UI는 유지
+    }
   };
 
   const goToRoadmap = (item) => {
