@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { historyApi, searchApi } from "@/api";
 
 const DEFAULT_TAGS = [
@@ -58,7 +58,8 @@ function normalizeTrendTags(data) {
 
 function Research() {
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
+  const { state } = useLocation();
+  const [query, setQuery] = useState(state?.autoSearch ?? "");
   const [tags, setTags] = useState(DEFAULT_TAGS);
   const [focused, setFocused] = useState(false);
   const [recents, setRecents] = useState(loadRecent);
@@ -135,6 +136,29 @@ function Research() {
     setRecents(next);
     saveRecent(next);
   };
+
+  // 홈 트렌딩 키워드 클릭으로 진입 시 자동 검색
+  useEffect(() => {
+    if (state?.autoSearch) {
+      const q = state.autoSearch.trim();
+      if (!q) return;
+      addRecent(q);
+      setIsSearching(true);
+      setSearchError("");
+      searchApi.searchPapers({ keyword: q })
+        .then((searchResult) => {
+          historyApi.saveHistory({ keyword: q }).catch(() => {});
+          navigate("/roadmap", { state: { query: q, searchResult } });
+        })
+        .catch((error) => {
+          setSearchError(
+            error?.response?.data?.message ?? error?.response?.data?.error ?? "검색 중 문제가 발생했습니다."
+          );
+          setIsSearching(false);
+        });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectRecent = (item) => {
     setQuery(item.query);
