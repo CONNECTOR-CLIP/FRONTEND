@@ -5,6 +5,7 @@ export const usersApi = {
   updateNickname: (payload) => unwrap(api.patch("/api/users/nickname", payload)),
   changePassword: (payload) =>
     unwrap(api.delete("/api/users/password", { data: payload })),
+  deleteAccount: () => unwrap(api.delete("/api/users/account")),
 };
 
 export const getUserInformation = usersApi.getInformation;

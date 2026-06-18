@@ -9,6 +9,7 @@ import SearchHistory from "@/pages/SearchHistory";
 import LandingPage from "@/pages/LandingPage";
 import SignupPage from "@/pages/SignupPage";
 import SignupCompletePage from "@/pages/SignupCompletePage";
+import MyPage from "@/pages/MyPage";
 
 export const router = createBrowserRouter([
   {
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
           { path: "Research", element: <Research /> },
           { path: "roadmap", element: <Roadmap /> },
           { path: "history", element: <SearchHistory /> },
+          { path: "mypage", element: <MyPage /> },
         ],
       },
     ],
