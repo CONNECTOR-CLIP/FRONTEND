@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { roadmapApi, gapApi, paperApi, bookmarksApi } from "@/api";
+import { roadmapApi, gapApi, paperApi, bookmarksApi, historyApi } from "@/api";
 import {
   ReactFlow,
   Background,
@@ -607,7 +607,7 @@ function useRoadmapFlow(root, onPaperClick, paperMap = {}) {
         })),
       ...expansion.edges,
     ]);
-  }, [expandedId, root, topicAngles, setNodes, setEdges]);
+  }, [expandedId, root, topicAngles, paperMap, setNodes, setEdges]);
 
   // 펼쳐진 topic 영역으로 카메라 포커스
   useEffect(() => {
@@ -640,7 +640,9 @@ function parseGapContent(content) {
   if (!content) return [];
   const tryParse = (val) => {
     if (typeof val !== "string") return val;
-    try { return JSON.parse(val); } catch { return null; }
+    // 마크다운 코드블록 제거 (```json ... ``` 또는 ``` ... ```)
+    const stripped = val.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+    try { return JSON.parse(stripped); } catch { return null; }
   };
   const parsed = tryParse(content);
   if (!parsed) return [{ title: "분석 결과", description: content }];
@@ -950,7 +952,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
     }
   }, [paperMap]);
 
-  const togglePaperBookmark = useCallback(async (paperId) => {
+  const togglePaperBookmark = useCallback(async (paperId, title, category) => {
     const isBookmarked = paperBookmarked.has(paperId);
     setPaperBookmarked((prev) => {
       const next = new Set(prev);
@@ -961,7 +963,11 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
       if (isBookmarked) {
         await bookmarksApi.removePaperBookmark(paperId);
       } else {
-        await bookmarksApi.addPaperBookmark({ paperId });
+        await bookmarksApi.addPaperBookmark({
+          paperId,
+          title: title ?? paperId,
+          category: category ?? "",
+        });
       }
     } catch {
       setPaperBookmarked((prev) => {
@@ -997,6 +1003,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   const [gapLoading, setGapLoading] = useState(false);
   const [gapError, setGapError] = useState("");
   const [bookmarked, setBookmarked] = useState(new Set());
+  const [bookmarkIdMap, setBookmarkIdMap] = useState({}); // index → backend id
   const [showPaperModal, setShowPaperModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [detailItem, setDetailItem] = useState(null);
@@ -1034,13 +1041,28 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
     runGapAnalysis(selectedIds);
   }, [selectedIds, runGapAnalysis]);
 
-  const toggleBookmark = useCallback((i) => {
-    setBookmarked((prev) => {
-      const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
-      return next;
-    });
-  }, []);
+  const toggleBookmark = useCallback(async (i) => {
+    const item = gapItems[i];
+    if (!item) return;
+    if (bookmarked.has(i)) {
+      const backendId = bookmarkIdMap[i];
+      setBookmarked((prev) => { const n = new Set(prev); n.delete(i); return n; });
+      if (backendId) {
+        bookmarksApi.removeGapBookmark(backendId).catch(() => {});
+        setBookmarkIdMap((prev) => { const n = { ...prev }; delete n[i]; return n; });
+      }
+    } else {
+      setBookmarked((prev) => { const n = new Set(prev); n.add(i); return n; });
+      try {
+        const res = await bookmarksApi.addGapBookmark({
+          title: item.title ?? item.name ?? "Gap 아이디어",
+          content: JSON.stringify(item),
+          keyword: searchQuery ?? "",
+        });
+        if (res?.id) setBookmarkIdMap((prev) => ({ ...prev, [i]: res.id }));
+      } catch {}
+    }
+  }, [bookmarked, bookmarkIdMap, gapItems, searchQuery]);
 
   /* 기존 GAP 결과 불러오기 */
 
@@ -1291,7 +1313,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           detail={paperDetail}
           loading={paperLoading}
           isBookmarked={paperBookmarked.has(selectedPaper.paperId)}
-          onBookmark={() => togglePaperBookmark(selectedPaper.paperId)}
+          onBookmark={() => togglePaperBookmark(selectedPaper.paperId, paperDetail?.title, paperDetail?.primaryCategory)}
           onClose={() => setSelectedPaper(null)}
         />
       )}
@@ -1327,9 +1349,64 @@ function PreviewFlowInner({ root, onInit }) {
 }
 
 /* ─── Roadmap Preview (Home page에서 import하여 사용) ─── */
-export function RoadmapPreview({ onInit }) {
-  const roots = useMemo(() => parseData(SAMPLE_DATA), []);
-  const root = roots[0];
+export function RoadmapPreview({ onInit, onKeywordLoad }) {
+  const [roadmapData, setRoadmapData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadLastRoadmap() {
+      try {
+        // 1. 마지막 검색 키워드 확인 (서버 기록 → localStorage 순)
+        let lastKeyword = null;
+        try {
+          const histData = await historyApi.getHistory();
+          const list = Array.isArray(histData)
+            ? histData
+            : histData?.data ?? histData?.content ?? histData?.histories ?? [];
+          const first = list[0];
+          lastKeyword = first?.keyword ?? first?.query ?? first?.searchWord ?? null;
+        } catch {
+          const local = JSON.parse(localStorage.getItem("clip_recent_searches") ?? "[]");
+          lastKeyword = local[0]?.query ?? null;
+        }
+
+        if (lastKeyword) onKeywordLoad?.(lastKeyword);
+
+        if (!lastKeyword) {
+          setRoadmapData(SAMPLE_DATA);
+          return;
+        }
+
+        // 2. 해당 키워드로 로드맵 API 호출
+        const data = await roadmapApi.getRoadmap({ keyword: lastKeyword });
+        const resolved = resolveRoadmapData(data);
+        setRoadmapData(resolved ?? SAMPLE_DATA);
+      } catch {
+        setRoadmapData(SAMPLE_DATA);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadLastRoadmap();
+  }, []);
+
+  const roots = useMemo(() => parseData(roadmapData ?? SAMPLE_DATA), [roadmapData]);
+  const root = roots[0] ?? null;
+
+  if (loading || !root) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <svg className="w-8 h-8 text-[#CBD5E1] animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p className="text-xs text-[#94A3B8]">로드맵 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ReactFlowProvider>
@@ -1345,6 +1422,7 @@ function Roadmap() {
   const initialData = resolveRoadmapData(state?.searchResult) ?? SAMPLE_DATA;
   const [roadmapData, setRoadmapData] = useState(initialData);
   const [apiError, setApiError] = useState("");
+  const [apiPapers, setApiPapers] = useState([]);
   const roots = useMemo(() => parseData(roadmapData), [roadmapData]);
   const root = useMemo(() => {
     if (roots.length <= 1) return roots[0] ?? null;
@@ -1360,6 +1438,7 @@ function Roadmap() {
   const papers = useMemo(() => {
     const searchPapers = state?.searchResult?.papers;
     if (searchPapers?.length > 0) return searchPapers;
+    if (apiPapers.length > 0) return apiPapers;
     const seen = new Set();
     const list = [];
     for (const r of (roadmapData?.roots ?? [])) {
@@ -1374,7 +1453,7 @@ function Roadmap() {
       }
     }
     return list;
-  }, [roadmapData, state?.searchResult?.papers]);
+  }, [roadmapData, state?.searchResult?.papers, apiPapers]);
 
   useEffect(() => {
     let ignore = false;
@@ -1394,9 +1473,15 @@ function Roadmap() {
           searchQuery ? { keyword: searchQuery } : undefined,
         );
         const nextData = resolveRoadmapData(data);
-        if (!ignore && nextData) {
-          setRoadmapData(nextData);
-          setApiError("");
+        const responsePapers = data?.papers ?? data?.data?.papers ?? [];
+        if (!ignore) {
+          if (nextData) {
+            setRoadmapData(nextData);
+            setApiError("");
+          }
+          if (responsePapers.length > 0) {
+            setApiPapers(responsePapers);
+          }
         }
       } catch {
         if (!ignore) {
