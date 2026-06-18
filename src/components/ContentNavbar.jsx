@@ -67,11 +67,23 @@ const NAV_ITEMS = [
   },
 ];
 
+const COMING_SOON_PATHS = new Set(["/network"]);
+
 function ContentNavbar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [showalert, setShowalert] = useState(false);
+  const [comingSoon, setComingSoon] = useState(false);
   const hasAlert = true;
+
+  const handleNavClick = (path) => {
+    if (COMING_SOON_PATHS.has(path)) {
+      setComingSoon(true);
+      setTimeout(() => setComingSoon(false), 2500);
+      return;
+    }
+    navigate(path);
+  };
 
   return (
     <>
@@ -92,7 +104,7 @@ function ContentNavbar() {
               return (
                 <button
                   key={path}
-                  onClick={() => navigate(path)}
+                  onClick={() => handleNavClick(path)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
                     ${
                       active
@@ -202,7 +214,9 @@ function ContentNavbar() {
               </button>
 
               {/* 프로필 아바타 */}
-              <button className="w-9 h-9 rounded-full bg-[#CBD5E1] flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-[#1D4ED8] transition-all">
+              <button
+                onClick={() => navigate("/mypage")}
+                className="w-9 h-9 rounded-full bg-[#CBD5E1] flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-[#1D4ED8] transition-all">
                 <svg
                   className="w-6 h-6 text-[#64748B]"
                   fill="currentColor"
@@ -217,6 +231,16 @@ function ContentNavbar() {
       </nav>
 
       {showalert && <AlertModal onClose={() => setShowalert(false)} />}
+
+      {comingSoon && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 bg-[#1E293B] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg animate-fade-in-down">
+          <svg className="w-4 h-4 text-[#FBBF24] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          준비중입니다. 기다려주세요!
+        </div>
+      )}
     </>
   );
 }
