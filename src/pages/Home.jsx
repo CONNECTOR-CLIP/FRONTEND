@@ -4,7 +4,7 @@ import { prepareWithSegments, layoutWithLines } from "@chenglou/pretext";
 import { RoadmapPreview } from "@/pages/Roadmap";
 import { searchApi, bookmarksApi, paperApi, historyApi } from "@/api";
 
-/* ─── Tag Colors ─── */
+// 태그 카테고리별 색상 매핑 — 없는 카테고리는 회색 처리
 const tagColor = (tag) => {
   const map = {
     AI: "bg-blue-100 text-blue-700",
@@ -16,7 +16,7 @@ const tagColor = (tag) => {
   return map[tag?.toUpperCase()] ?? "bg-gray-100 text-gray-600";
 };
 
-/* ─── 활동 아이콘 ─── */
+// 최근 활동 리스트의 아이콘 — 검색/북마크 두 가지 타입
 function ActivityIcon({ type }) {
   const base = "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0";
   if (type === "search")
@@ -38,7 +38,7 @@ function ActivityIcon({ type }) {
   );
 }
 
-/* ─── 날짜 포맷 ─── */
+// ISO 날짜를 "방금 전 / N분 전 / N시간 전 / N일 전" 형태로 변환
 function timeAgo(isoStr) {
   if (!isoStr) return "";
   const diff = Date.now() - new Date(isoStr).getTime();
@@ -50,7 +50,7 @@ function timeAgo(isoStr) {
   return `${Math.floor(h / 24)}일 전`;
 }
 
-/* ─── Paper Card ─── */
+// 논문 카드 컴포넌트 — 제목 너비 측정 후 요약문 maxWidth를 맞춰 레이아웃 정렬
 function PaperCard({ paper }) {
   const titleRef = useRef(null);
   const [descMaxWidth, setDescMaxWidth] = useState(null);
@@ -60,6 +60,7 @@ function PaperCard({ paper }) {
   const date = paper.createdDate ?? paper.published ?? "";
   const category = paper.privaryCategory ?? paper.categories?.split(",")?.[0] ?? "";
 
+  // 제목 텍스트의 실제 렌더링 너비를 측정해 요약문 너비를 일치시킴
   useLayoutEffect(() => {
     const el = titleRef.current;
     if (!el || !title) return;
@@ -102,7 +103,7 @@ function PaperCard({ paper }) {
   );
 }
 
-/* ─── Home Page ─── */
+// 홈(대시보드) 페이지 — 최근 로드맵, 트렌딩 키워드, 내 현황, 최근 활동, 최근 논문 표시
 function Home() {
   const navigate = useNavigate();
   const [flowInstance, setFlowInstance] = useState(null);
@@ -114,7 +115,9 @@ function Home() {
   const [recentPapers, setRecentPapers] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // 마운트 시 4개 API를 병렬 요청 — 하나 실패해도 나머지는 계속 처리
   useEffect(() => {
+    // 응답이 배열이거나 특정 키 아래 배열인 경우를 모두 처리
     const normalize = (data, keys) => {
       if (Array.isArray(data)) return data;
       for (const k of keys) if (Array.isArray(data?.[k])) return data[k];
@@ -129,6 +132,7 @@ function Home() {
     ]).then(([trend, bm, hist, papers]) => {
       if (trend.status === "fulfilled") {
         const list = normalize(trend.value, ["data", "keywords", "trends"]);
+        // 상위 3개만 랭킹 형태로 가공
         setTrendKeywords(list.slice(0, 3).map((kw, i) => ({ rank: i + 1, label: typeof kw === "string" ? kw : kw.keyword ?? kw.label ?? "" })));
       }
       if (bm.status === "fulfilled") {
@@ -148,10 +152,10 @@ function Home() {
     });
   }, []);
 
-  /* ── 내 현황 계산 ── */
   const bookmarkCount = bookmarks.length;
   const historyCount = history.length;
 
+  // 북마크 중 가장 많이 저장한 카테고리 계산
   const topCategory = useMemo(() => {
     if (!bookmarks.length) return "-";
     const freq = {};
@@ -169,7 +173,7 @@ function Home() {
     { label: "최근에 많이 스크랩한 키워드", value: topCategory },
   ];
 
-  /* ── 최근 활동 조합 ── */
+  // 검색 기록과 북마크를 합쳐 최근 활동 목록 생성 (최대 3개)
   const recentActivities = useMemo(() => {
     const histItems = history.slice(0, 3).map(h => ({
       icon: "search",
@@ -181,6 +185,7 @@ function Home() {
       text: `'${b.title ?? b.paperId}' 북마크 저장`,
       time: "",
     }));
+    // 검색 기록 먼저 채우고 부족하면 북마크로 보충
     const merged = [...histItems];
     for (const bm of bmItems) {
       if (merged.length >= 3) break;
@@ -191,9 +196,9 @@ function Home() {
 
   return (
     <div className="mx-auto max-w-screen-3xl px-8 py-8 flex flex-col gap-6">
-      {/* ── 상단: 로드맵(좌) / 사이드바(우) ── */}
+      {/* 상단: 로드맵(좌) / 사이드바(우) */}
       <div className="flex gap-6">
-        {/* Left: 타이틀 + 로드맵 */}
+        {/* 왼쪽: 로드맵 프리뷰 영역 */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           <div>
             <h1 className="text-lg font-bold text-[#173355]">CLIP Dashboard</h1>
@@ -210,11 +215,13 @@ function Home() {
               <span className="font-semibold text-[#1E293B]">최근 로드맵</span>
               <span className="text-sm text-[#94A3B8] ml-1">Recent Roadmap</span>
             </div>
+            {/* RoadmapPreview — flowInstance를 받아 홈에서 줌 조작 가능하게 함 */}
             <div className="h-160 bg-white mx-4 rounded-xl overflow-hidden">
               <RoadmapPreview onInit={setFlowInstance} onKeywordLoad={setLastKeyword} />
             </div>
             <div className="flex justify-end items-center gap-2 px-6 py-4">
               <div className="flex gap-1.5 ml-1">
+                {/* 줌 인 */}
                 <button onClick={() => flowInstance?.zoomIn({ duration: 200 })}
                   className="rounded-full w-15 h-15 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -224,6 +231,7 @@ function Home() {
                     <line x1="16.5" y1="16.5" x2="21" y2="21" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </button>
+                {/* 줌 아웃 */}
                 <button onClick={() => flowInstance?.zoomOut({ duration: 200 })}
                   className="rounded-full w-15 h-15 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -232,6 +240,7 @@ function Home() {
                     <line x1="16.5" y1="16.5" x2="21" y2="21" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </button>
+                {/* 전체화면 — 마지막 키워드가 있으면 state로 전달 */}
                 <button onClick={() => navigate("/roadmap", lastKeyword ? { state: { query: lastKeyword } } : undefined)}
                   className="rounded-full w-15 h-15 bg-[#000000]/15 text-white flex items-center justify-center hover:bg-[#00509e] transition-colors">
                   <svg width="20" height="20" viewBox="0 0 11 11" fill="none">
@@ -243,9 +252,9 @@ function Home() {
           </div>
         </div>
 
-        {/* ── Right Sidebar ── */}
+        {/* 오른쪽 사이드바 — 트렌딩 키워드, 내 현황, 최근 활동 */}
         <div className="w-[400px] shrink-0 flex flex-col gap-[32px]">
-          {/* 트렌딩 키워드 */}
+          {/* 트렌딩 키워드 — 클릭 시 Research 페이지로 자동 검색 이동 */}
           <div className="rounded-2xl border border-[#E2E8F0] bg-[#EFF3FF] shadow-sm p-[32px]">
             <div className="flex items-center justify-between mb-4">
               <span className="font-semibold text-[#1E293B] text-sm">트렌딩 중인 키워드</span>
@@ -277,7 +286,7 @@ function Home() {
             )}
           </div>
 
-          {/* 내 현황 */}
+          {/* 내 현황 — 북마크 수, 검색 횟수, 주요 카테고리 */}
           <div className="rounded-2xl border border-[#E2E8F0] bg-[#EFF3FF] shadow-sm p-5">
             <div className="flex items-center gap-1.5 mb-4">
               <span className="font-semibold text-[#1E293B] text-sm">내 현황</span>
@@ -290,6 +299,7 @@ function Home() {
                   {loading ? (
                     <div className="h-8 w-12 rounded bg-gray-200 animate-pulse mt-1" />
                   ) : (
+                    // 숫자는 크게, 텍스트(카테고리명)는 약간 작게 표시
                     <p className={`font-bold ${typeof s.value === "number" ? "text-[30px] text-[#0060AD]" : "text-[22px] text-[#173355]"}`}>
                       {s.value ?? 0}
                     </p>
@@ -333,7 +343,7 @@ function Home() {
         </div>
       </div>
 
-      {/* ── 하단: 최근 본 논문 ── */}
+      {/* 하단: 최근 본 논문 카드 3개 */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-bold text-[#1E293B]">최근 본 논문</h2>

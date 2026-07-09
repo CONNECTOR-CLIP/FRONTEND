@@ -1,7 +1,7 @@
 import { Outlet } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 
-// 파스텔톤
+// 배경 orb에 쓸 파스텔 색상 팔레트
 const PALETTE = [
   "#bfdbfe",
   "#ddd6fe",
@@ -17,10 +17,12 @@ const PALETTE = [
   "#93c5fd",
 ];
 
+// 팔레트에서 랜덤 색상 하나 선택
 function randomColor() {
   return PALETTE[Math.floor(Math.random() * PALETTE.length)];
 }
 
+// 배경에 떠다니는 orb 설정 — 위치와 애니메이션 타이밍을 개별 지정
 const orbs = [
   {
     color: randomColor(),
@@ -40,6 +42,7 @@ const orbs = [
   },
 ];
 
+// 비로그인 페이지 레이아웃 — Navbar + 움직이는 배경 orb + 페이지 콘텐츠
 function LoginLayout() {
   return (
     <div className="relative min-h-screen overflow-hidden min-w-[900px]">
@@ -53,7 +56,7 @@ function LoginLayout() {
         }
       `}</style>
 
-      {/* bg blur orbs */}
+      {/* 클릭 이벤트 차단하고 배경만 담당하는 레이어 */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         {orbs.map((orb, i) => (
           <div

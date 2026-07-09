@@ -2,16 +2,17 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "@/api";
 
+// 임시 중복 체크용 목록 — 실제 서비스에선 서버 API로 대체 필요
 const USED_IDS = ["admin", "user123", "clip"];
 const USED_NICKNAMES = ["관리자", "운영자", "clip"];
 const USED_EMAILS = ["test@test.com", "admin@clip.com"];
 
+// 회원가입 페이지 — 아이디/비밀번호/닉네임/이메일 입력 및 이메일 인증 포함
 function SignupPage() {
   const navigate = useNavigate();
   const [emailVerified, setEmailVerified] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [toast, setToast] = useState("");
 
   const [form, setForm] = useState({
@@ -29,11 +30,13 @@ function SignupPage() {
     email: "",
   });
 
+  // 토스트 메시지 3초 후 자동 사라짐
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
   };
 
+  // 각 필드별 유효성 검사 함수 모음
   const validators = {
     id: (v) => {
       if (/[^a-zA-Z0-9가-힣]/.test(v))
@@ -48,6 +51,7 @@ function SignupPage() {
         return "8~20자, 특수문자 1개를 포함해주세요.";
       return "";
     },
+    // passwordConfirm은 form 전체를 받아 password와 비교
     passwordConfirm: (v, f) => {
       if (v !== f.password) return "비밀번호가 일치하지 않습니다.";
       return "";
@@ -64,9 +68,11 @@ function SignupPage() {
     },
   };
 
+  // 입력 변경 시 해당 필드 유효성 즉시 검사
   const handleChange = (field, value) => {
     const updated = { ...form, [field]: value };
     setForm(updated);
+    // 빈 값이면 에러 표시하지 않음 (입력 시작 전에 빨간 테두리 방지)
     const err = value
       ? field === "passwordConfirm"
         ? validators.passwordConfirm(value, updated)
@@ -76,6 +82,7 @@ function SignupPage() {
   };
 
   const handleSubmit = async () => {
+    // 빈 항목 검사
     if (
       !form.id ||
       !form.password ||
@@ -86,6 +93,7 @@ function SignupPage() {
       showToast("항목을 모두 작성해 주세요.");
       return;
     }
+    // 최종 유효성 재검사 — 모든 필드 한 번에 확인
     const newErrors = {
       id: validators.id(form.id),
       password: validators.password(form.password),
@@ -96,6 +104,7 @@ function SignupPage() {
     setErrors(newErrors);
     if (Object.values(newErrors).some(Boolean)) return;
 
+    // 이메일 인증 없이 제출하면 차단
     if (!emailVerified) {
       showToast("이메일을 인증해주세요.");
       return;
@@ -109,6 +118,7 @@ function SignupPage() {
         nickname: form.nickname,
         email: form.email,
       });
+      // 완료 페이지에 닉네임 전달해서 환영 메시지에 사용
       navigate("/signup/complete", { state: { nickname: form.nickname } });
     } catch (error) {
       showToast(
@@ -122,6 +132,7 @@ function SignupPage() {
   };
 
   const handleSendEmail = () => {
+    // 이메일 유효성 먼저 검사 후 발송
     const emailErr = form.email
       ? validators.email(form.email)
       : "이메일을 입력해주세요.";
@@ -130,10 +141,12 @@ function SignupPage() {
       return;
     }
     setEmailSent(true);
+    // 이메일 재입력 시 인증 상태 초기화되므로 같이 리셋
     setEmailVerified(false);
     showToast("인증 메일을 발송했습니다.");
   };
 
+  // 에러 여부에 따라 input 테두리 색상 변경
   const inputClass = (field) =>
     `border rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-1 ${
       errors[field]
@@ -143,6 +156,7 @@ function SignupPage() {
 
   return (
     <div className="flex justify-center items-center min-h-[calc(100vh-64px)] py-12">
+      {/* 에러/안내 토스트 — 상단 중앙 고정 */}
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white text-sm px-6 py-3 rounded-lg shadow-lg">
           {toast}
@@ -234,7 +248,7 @@ function SignupPage() {
             />
           </div>
 
-          {/* 이메일 */}
+          {/* 이메일 + 인증 */}
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700">
@@ -250,6 +264,7 @@ function SignupPage() {
                 value={form.email}
                 onChange={(e) => {
                   handleChange("email", e.target.value);
+                  // 이메일 수정 시 인증 상태 초기화
                   setEmailSent(false);
                   setEmailVerified(false);
                 }}
@@ -264,6 +279,7 @@ function SignupPage() {
                 {emailSent ? "재발송" : "인증하기"}
               </button>
             </div>
+            {/* 테스트용 인증 완료 버튼 — 실제 이메일 링크 없이 인증 상태를 강제로 통과 */}
             {emailSent && !emailVerified && (
               <button
                 type="button"

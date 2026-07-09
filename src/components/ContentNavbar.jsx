@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AlertModal from "./AlertModal";
 
+// 서비스 내부 상단 네비게이션 바 — 로그인 후 모든 페이지에서 사용
 const NAV_ITEMS = [
   {
     label: "Dashboard",
@@ -67,6 +68,7 @@ const NAV_ITEMS = [
   },
 ];
 
+// 아직 개발 안 된 메뉴 경로 — 클릭 시 준비중 토스트를 띄움
 const COMING_SOON_PATHS = new Set(["/network"]);
 
 function ContentNavbar() {
@@ -74,9 +76,10 @@ function ContentNavbar() {
   const { pathname } = useLocation();
   const [showalert, setShowalert] = useState(false);
   const [comingSoon, setComingSoon] = useState(false);
-  const hasAlert = true;
+  const hasAlert = true; // 알림 뱃지 표시 여부 (추후 서버 연동 예정)
 
   const handleNavClick = (path) => {
+    // 준비중인 메뉴는 이동 막고 토스트 2.5초 후 자동 숨김
     if (COMING_SOON_PATHS.has(path)) {
       setComingSoon(true);
       setTimeout(() => setComingSoon(false), 2500);
@@ -97,7 +100,7 @@ function ContentNavbar() {
             CLIP
           </button>
 
-          {/* 가운데 메뉴 — absolute 중앙 정렬 */}
+          {/* 가운데 메뉴 — absolute로 중앙 정렬해 좌우 요소 크기에 영향 안 받음 */}
           <div className="absolute left-[35%] -translate-x-1/2 flex items-center gap-5">
             {NAV_ITEMS.map(({ label, path, icon }) => {
               const active = pathname === path;
@@ -119,6 +122,7 @@ function ContentNavbar() {
                       {icon}
                     </span>
                   )}
+                  {/* 현재 페이지는 밑줄 강조 */}
                   <span
                     className={
                       active ? "border-b-2 border-[#1D4ED8] pb-0.5" : ""
@@ -131,9 +135,8 @@ function ContentNavbar() {
             })}
           </div>
 
-          {/* 오른쪽: 검색바 */}
+          {/* 오른쪽: 검색바 + 알림/설정/마이페이지 */}
           <div className="flex items-center gap-20 shrink-0">
-            {/* 검색바 */}
             <div className="flex items-center gap-2 rounded-full border border-[#E2E8F0] bg-[#f9f9f9] px-4 py-2 w-80 focus-within:border-[#1D4ED8] transition-colors">
               <svg
                 className="w-6 h-4 text-[#3e69a6] shrink-0"
@@ -155,8 +158,8 @@ function ContentNavbar() {
               />
             </div>
 
-            {/* 알림 + 설정 + 마이페이지 */}
             <div className="flex gap-5">
+              {/* 알림 버튼 — hasAlert 여부에 따라 빨간 뱃지 표시 */}
               <button
                 onClick={() => setShowalert(true)}
                 className="relative p-1 cursor-pointer"
@@ -213,10 +216,11 @@ function ContentNavbar() {
                 </svg>
               </button>
 
-              {/* 프로필 아바타 */}
+              {/* 프로필 아바타 — 클릭 시 마이페이지로 이동 */}
               <button
                 onClick={() => navigate("/mypage")}
-                className="w-9 h-9 rounded-full bg-[#CBD5E1] flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-[#1D4ED8] transition-all">
+                className="w-9 h-9 rounded-full bg-[#CBD5E1] flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-[#1D4ED8] transition-all"
+              >
                 <svg
                   className="w-6 h-6 text-[#64748B]"
                   fill="currentColor"
@@ -232,11 +236,21 @@ function ContentNavbar() {
 
       {showalert && <AlertModal onClose={() => setShowalert(false)} />}
 
+      {/* 준비중 토스트 — 2.5초 후 자동 사라짐 */}
       {comingSoon && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 bg-[#1E293B] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg animate-fade-in-down">
-          <svg className="w-4 h-4 text-[#FBBF24] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            className="w-4 h-4 text-[#FBBF24] shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
           준비중입니다. 기다려주세요!
         </div>
