@@ -1,10 +1,22 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import LoginModal from "@/components/LoginModal";
 
+// 랜딩/회원가입 등 비로그인 페이지 상단 네비게이션 바
 function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showLogin, setShowLogin] = useState(false);
+
+  const scrollToSection = (sectionId) => {
+    if (location.pathname === "/") {
+      document
+        .getElementById(sectionId)
+        ?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      navigate(`/#${sectionId}`);
+    }
+  };
 
   return (
     <>
@@ -17,6 +29,7 @@ function Navbar() {
             id="logo"
             className="text-xl font-extrabold tracking-tight text-[#1D4ED8]"
           >
+            {/* 로고 클릭 시 랜딩 페이지(/)로 이동 */}
             <button
               onClick={() => navigate("/")}
               className="w-[50px] h-[32px] text-[24px] font-extrabold hover:cursor-pointer"
@@ -29,31 +42,32 @@ function Navbar() {
             className="flex items-center gap-8 text-[#64748B]"
           >
             <button
-              onClick={() => navigate("/Features")}
+              onClick={() => scrollToSection("features")}
               className="text-sm hover:text-black"
             >
               Features
             </button>
             <button
-              onClick={() => navigate("/Research")}
+              onClick={() => scrollToSection("research")}
               className="text-sm hover:text-black"
             >
-              Research
+              Team Blog
             </button>
             <button
-              onClick={() => navigate("/Pricing")}
+              onClick={() => scrollToSection("Team Blog")}
               className="text-sm hover:text-black"
             >
               Pricing
             </button>
             <button
-              onClick={() => navigate("/Documentation")}
+              onClick={() => scrollToSection("documentation")}
               className="text-sm hover:text-black"
             >
               Documentation
             </button>
           </div>
           <div id="profile" className="flex items-center gap-6">
+            {/* Sign in / Start 버튼 둘 다 로그인 모달 열기 */}
             <button
               onClick={() => setShowLogin(true)}
               className="text-[16px] text-[#64748B] hover:text-black"
