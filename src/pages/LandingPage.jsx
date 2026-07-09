@@ -1,10 +1,19 @@
 import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import useAuthStore from "@/store/useAuthStore";
+import { Link } from "react-router-dom";
 
 // 서비스 소개 랜딩 페이지 — 비로그인 사용자가 처음 보는 화면
 function LandingPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/home", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     if (location.hash) {
@@ -38,13 +47,21 @@ function LandingPage() {
         </div>
         <div className="flex gap-[24px]">
           {/* CTA 버튼 — 로그인 없이 홈으로 바로 접근 (개발 중 편의) */}
+
           <div className="border-[#e5e7eb]-0 bg-linear-to-r from-[#3b82f6] to-[#2563eb] w-[236px] h-[68px] flex items-center justify-center rounded-[12px] text-white">
             <button onClick={() => navigate("/home")}>
               흐름 정리해보기 -{">"}
             </button>
           </div>
           <div className="border w-[218px] h-[68px] flex items-center justify-center rounded-[12px]">
-            <button onClick={() => navigate("/Demo")}>Watch Demo</button>
+            <button
+              onClick={() =>
+                (window.location.href =
+                  "https://youtu.be/y5TJsc2b6Uo?si=Sb9KHd6z6-9U8Mf6")
+              }
+            >
+              Watch Demo
+            </button>
           </div>
         </div>
         {/* 서비스 지표 통계 */}
@@ -110,7 +127,7 @@ function LandingPage() {
       {/* Research 섹션 */}
       <section
         id="research"
-        className="flex flex-col items-center gap-[32px] py-[120px] px-[40px] bg-[#f8fafc]"
+        className="flex flex-col items-center gap-[32px] py-[120px] px-[40px]"
       >
         <p className="text-[14px] font-medium text-[#3b82f6] border border-[#e5e7eb] rounded-[8px] px-[20px] py-[8px]">
           Research
@@ -141,34 +158,43 @@ function LandingPage() {
 
       {/* Pricing 섹션 */}
       <section
-        id="pricing"
+        id="Team Blog"
         className="flex flex-col items-center gap-[32px] py-[120px] px-[40px]"
       >
         <p className="text-[14px] font-medium text-[#3b82f6] border border-[#e5e7eb] rounded-[8px] px-[20px] py-[8px]">
-          Pricing
+          Team Blog
         </p>
-        <p className="font-bold text-[56px] text-center">합리적인 요금제</p>
+        <p className="font-bold text-[56px] text-center">
+          저희의 개발이 궁금하다면?
+        </p>
         <p className="text-[#9ca3af] text-[20px] text-center max-w-[700px]">
-          개인 연구자부터 기업까지 다양한 요금제를 제공합니다.
+          개발자들의 블로그를 통해 CLIP의 개발 과정과 기술 스택을 확인할 수
+          있습니다.
         </p>
         <div className="flex gap-[32px] mt-[20px]">
           {[
             {
-              plan: "Free",
-              price: "₩0",
-              desc: "기본 논문 검색 및 분석",
+              Developer: "YeJin",
+              current: "준비 중..",
+              desc: "PM",
               highlight: false,
             },
             {
-              plan: "Pro",
-              price: "₩9,900/월",
-              desc: "무제한 분석 및 로드맵",
-              highlight: true,
+              Developer: "WonJae",
+              current: "준비 중..",
+              desc: "프론트엔드, 백엔드",
+              highlight: false,
             },
             {
-              plan: "Enterprise",
-              price: "문의",
-              desc: "팀 협업 및 전용 지원",
+              Developer: "EunChae",
+              current: "준비 중..",
+              desc: "백엔드",
+              highlight: false,
+            },
+            {
+              Developer: "BumGi",
+              current: "준비 중..",
+              desc: "AI",
               highlight: false,
             },
           ].map((item) => (
@@ -176,8 +202,8 @@ function LandingPage() {
               key={item.plan}
               className={`flex flex-col gap-[16px] w-[280px] rounded-[16px] p-[32px] ${item.highlight ? "bg-[#3b82f6] text-white" : "border border-[#e5e7eb]"}`}
             >
-              <p className="font-bold text-[20px]">{item.plan}</p>
-              <p className="font-bold text-[36px]">{item.price}</p>
+              <p className="font-bold text-[20px]">{item.Developer}</p>
+              <p className="font-bold text-[36px]">{item.current}</p>
               <p
                 className={item.highlight ? "text-[#bfdbfe]" : "text-[#9ca3af]"}
               >
@@ -191,7 +217,7 @@ function LandingPage() {
       {/* Documentation 섹션 */}
       <section
         id="documentation"
-        className="flex flex-col items-center gap-[32px] py-[120px] px-[40px] bg-[#f8fafc]"
+        className="flex flex-col items-center gap-[32px] py-[120px] px-[40px]"
       >
         <p className="text-[14px] font-medium text-[#3b82f6] border border-[#e5e7eb] rounded-[8px] px-[20px] py-[8px]">
           Documentation

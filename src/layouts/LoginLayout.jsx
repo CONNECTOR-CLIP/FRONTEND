@@ -22,30 +22,29 @@ function randomColor() {
   return PALETTE[Math.floor(Math.random() * PALETTE.length)];
 }
 
-// 배경에 떠다니는 orb 설정 — 위치와 애니메이션 타이밍을 개별 지정
+// 배경에 떠다니는 orb 설정 — 랜딩 페이지 5개 섹션 전체에 고르게 배치
 const orbs = [
-  {
-    color: randomColor(),
-    size: 500,
-    top: "-5%",
-    left: "-8%",
-    duration: 18,
-    delay: 0,
-  },
-  {
-    color: randomColor(),
-    size: 420,
-    top: "55%",
-    left: "70%",
-    duration: 22,
-    delay: 3,
-  },
+  // Hero 섹션
+  { color: randomColor(), size: 500, top: "-5%",  left: "-8%",  duration: 18, delay: 0 },
+  { color: randomColor(), size: 420, top: "-10%", left: "70%",  duration: 24, delay: 3 },
+  // Features 섹션
+  { color: randomColor(), size: 380, top: "16%",  left: "75%",  duration: 20, delay: 1 },
+  { color: randomColor(), size: 350, top: "22%",  left: "-6%",  duration: 26, delay: 5 },
+  // Research 섹션
+  { color: randomColor(), size: 400, top: "38%",  left: "60%",  duration: 22, delay: 2 },
+  { color: randomColor(), size: 320, top: "44%",  left: "-4%",  duration: 30, delay: 7 },
+  // Pricing 섹션
+  { color: randomColor(), size: 450, top: "58%",  left: "-10%", duration: 19, delay: 4 },
+  { color: randomColor(), size: 360, top: "62%",  left: "72%",  duration: 25, delay: 1 },
+  // Documentation 섹션
+  { color: randomColor(), size: 400, top: "78%",  left: "15%",  duration: 21, delay: 6 },
+  { color: randomColor(), size: 380, top: "82%",  left: "68%",  duration: 28, delay: 2 },
 ];
 
 // 비로그인 페이지 레이아웃 — Navbar + 움직이는 배경 orb + 페이지 콘텐츠
 function LoginLayout() {
   return (
-    <div className="relative min-h-screen overflow-hidden min-w-[900px]">
+    <div className="relative min-h-screen overflow-x-hidden min-w-[900px]">
       <style>{`
         @keyframes orb-float {
           0%   { transform: translate(0px, 0px)    scale(1);    }
@@ -78,7 +77,9 @@ function LoginLayout() {
       </div>
 
       <Navbar />
-      <Outlet />
+      <div className="pt-16">
+        <Outlet />
+      </div>
     </div>
   );
 }

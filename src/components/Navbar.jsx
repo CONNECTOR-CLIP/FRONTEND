@@ -20,7 +20,7 @@ function Navbar() {
 
   return (
     <>
-      <nav className="w-full border-b border-gray-200 bg-white/60 backdrop-blur-md">
+      <nav className="fixed top-0 z-50 w-full border-b border-gray-200 bg-white/60 backdrop-blur-md">
         <div
           id="navbar"
           className="mx-auto flex h-16 max-w-9xl items-center justify-between px-8"
@@ -57,7 +57,7 @@ function Navbar() {
               onClick={() => scrollToSection("Team Blog")}
               className="text-sm hover:text-black"
             >
-              Pricing
+              Team Blog
             </button>
             <button
               onClick={() => scrollToSection("documentation")}
@@ -69,7 +69,7 @@ function Navbar() {
           <div id="profile" className="flex items-center gap-6">
             {/* Sign in / Start 버튼 둘 다 로그인 모달 열기 */}
             <button
-              onClick={() => setShowLogin(true)}
+              onClick={() => navigate("/signup")}
               className="text-[16px] text-[#64748B] hover:text-black"
             >
               Sign in
