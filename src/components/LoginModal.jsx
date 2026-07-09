@@ -18,7 +18,9 @@ function getToken(data) {
 
 // 유저 객체 위치도 서버마다 다를 수 있으므로 fallback 처리
 function getUser(data) {
-  return data?.user ?? data?.member ?? data?.profile ?? data?.data?.user ?? data;
+  return (
+    data?.user ?? data?.member ?? data?.profile ?? data?.data?.user ?? data
+  );
 }
 
 // 에러 응답에서 사람이 읽을 수 있는 메시지만 추출
@@ -51,8 +53,18 @@ function LoginModal({ onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.email.trim() || !form.password) {
-      setError("아이디와 비밀번호를 입력해주세요.");
+
+    if (form.email.trim().length < 1 && form.password.length < 1) {
+      setError("아이디와 비밀번호를 모두 입력해주세요");
+      return;
+    }
+
+    if (form.email.trim().length < 1) {
+      setError("아이디를 입력해주세요");
+      return;
+    }
+    if (form.password.length < 1) {
+      setError("비밀번호를 입력해주세요");
       return;
     }
 
@@ -209,8 +221,7 @@ function LoginModal({ onClose }) {
         </div>
 
         <p className="text-center text-sm text-[#64748B] mt-4">
-          계정이 없으신가요?{" "}
-          {/* 모달 닫고 회원가입 페이지로 이동 */}
+          계정이 없으신가요? {/* 모달 닫고 회원가입 페이지로 이동 */}
           <span
             onClick={() => {
               onClose();
