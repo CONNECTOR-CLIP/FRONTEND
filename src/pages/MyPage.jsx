@@ -4,7 +4,7 @@ import useAuthStore from "@/store/useAuthStore";
 import { usersApi } from "@/api/users";
 import { bookmarksApi } from "@/api/bookmarks";
 
-// ─── 아이콘 ───────────────────────────────────────────────
+// ─── 아이콘 컴포넌트 모음 ────────────────────────────────
 function IconUser() {
   return (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,7 +69,7 @@ function IconTrash() {
   );
 }
 
-// ─── 공통 컴포넌트 ─────────────────────────────────────────
+// ─── 공통 검색 입력 컴포넌트 ──────────────────────────────
 function SearchBar({ value, onChange, placeholder }) {
   return (
     <div className="flex items-center gap-2 bg-white rounded-2xl border border-[#E2E8F0] px-4 py-3 focus-within:border-[#1D4ED8] shadow-sm transition-all">
@@ -90,6 +90,7 @@ function SearchBar({ value, onChange, placeholder }) {
   );
 }
 
+// 2.5초 후 자동 사라지는 토스트 메시지
 function Toast({ msg, type = "success", onClose }) {
   useEffect(() => {
     const t = setTimeout(onClose, 2500);
@@ -103,7 +104,7 @@ function Toast({ msg, type = "success", onClose }) {
   );
 }
 
-// ─── 확인 다이얼로그 ────────────────────────────────────────
+// 확인/취소 다이얼로그 — danger=true 이면 확인 버튼을 빨간색으로 표시
 function ConfirmDialog({ title, message, confirmLabel = "확인", cancelLabel = "취소", onConfirm, onCancel, danger = false }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
@@ -128,7 +129,8 @@ function ConfirmDialog({ title, message, confirmLabel = "확인", cancelLabel = 
   );
 }
 
-// ─── 계정 설정 ─────────────────────────────────────────────
+// ─── 계정 설정 섹션 ────────────────────────────────────────
+// 닉네임 변경, 비밀번호 변경, 회원 탈퇴 기능 포함
 function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
   const [nicknameEdit, setNicknameEdit] = useState(false);
   const [newNickname, setNewNickname] = useState("");
@@ -143,6 +145,7 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
 
   const showToast = (msg, type = "success") => setToast({ msg, type });
 
+  // 입력 중 실시간 유효성 검사
   const handleNicknameChange = (val) => {
     setNewNickname(val);
     if (val.length > 10) {
@@ -161,6 +164,7 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
     setLoading(true);
     try {
       await usersApi.updateNickname({ nickname: newNickname.trim() });
+      // 부모 컴포넌트의 user 상태도 같이 갱신
       onUserUpdate({ ...user, nickname: newNickname.trim() });
       setNicknameEdit(false);
       setNewNickname("");
@@ -252,6 +256,7 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
                 className="px-4 py-2 text-sm text-[#94A3B8] hover:text-[#1E293B] transition-colors">
                 취소
               </button>
+              {/* 에러가 있거나 빈 값이면 비활성화 */}
               <button onClick={handleNicknameSave} disabled={loading || !!nicknameError || !newNickname.trim()}
                 className="px-5 py-2 text-sm bg-[#1D4ED8] text-white rounded-xl hover:bg-[#1E40AF] disabled:opacity-50 transition-colors">
                 변경
@@ -276,6 +281,7 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
         </div>
         {pwEdit ? (
           <div className="flex flex-col gap-3">
+            {/* 3개 입력 필드를 배열로 렌더링 */}
             {[
               { label: "현재 비밀번호", val: currentPw, set: setCurrentPw },
               { label: "새 비밀번호", val: newPw, set: setNewPw },
@@ -304,7 +310,7 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
         )}
       </div>
 
-      {/* 회원 탈퇴 */}
+      {/* 회원 탈퇴 — 되돌릴 수 없는 작업이므로 별도 확인 다이얼로그 거침 */}
       <div className="bg-white rounded-2xl border border-[#FEE2E2] p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
@@ -334,7 +340,8 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
   );
 }
 
-// ─── 내 북마크 ─────────────────────────────────────────────
+// ─── 내 북마크 섹션 ────────────────────────────────────────
+// 논문 북마크와 Gap 북마크를 탭으로 구분하여 표시
 function BookmarkSection() {
   const [tab, setTab] = useState("paper"); // "paper" | "gap"
   const [bookmarks, setBookmarks] = useState([]);
@@ -372,6 +379,7 @@ function BookmarkSection() {
     }
   }, []);
 
+  // 탭 전환 시 해당 데이터 로드
   useEffect(() => {
     if (tab === "paper") fetchBookmarks();
     else fetchGapBookmarks();
@@ -380,6 +388,7 @@ function BookmarkSection() {
   const handleRemove = async (id) => {
     try {
       await bookmarksApi.removePaperBookmark(id);
+      // 서버 확인 후 로컬 상태에서도 제거
       setBookmarks((prev) => prev.filter((b) => (b.paperId ?? b.paper_id ?? b.id) !== id));
       showToast("북마크가 삭제되었습니다.");
     } catch {
@@ -397,6 +406,7 @@ function BookmarkSection() {
     }
   };
 
+  // 검색어 기준 클라이언트 사이드 필터링
   const filtered = bookmarks.filter((b) => {
     const title = b.title ?? b.paperTitle ?? b.paper_id ?? "";
     return !query || title.toLowerCase().includes(query.toLowerCase());
@@ -416,7 +426,7 @@ function BookmarkSection() {
     <div className="flex flex-col gap-5">
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* 탭 */}
+      {/* 탭 전환 — 탭 변경 시 검색어도 초기화 */}
       <div className="flex gap-1 bg-[#F1F5F9] rounded-xl p-1 w-fit">
         {TABS.map(({ key, label }) => (
           <button key={key} onClick={() => { setTab(key); setQuery(""); }}
@@ -453,6 +463,7 @@ function BookmarkSection() {
                   const title = b.title ?? b.paperTitle ?? id;
                   const category = b.category ?? b.privaryCategory ?? "";
                   return (
+                    // 클릭 시 해당 논문 제목으로 로드맵 검색
                     <li key={id} className="flex items-center gap-4 px-6 py-4 border-b border-[#F1F5F9] last:border-0
                       hover:bg-[#F8FAFC] group cursor-pointer transition-colors"
                       onClick={() => navigate("/roadmap", { state: { query: title } })}>
@@ -466,6 +477,7 @@ function BookmarkSection() {
                         <p className="text-sm font-semibold text-[#1E293B] truncate">{title}</p>
                         {category && <p className="text-xs text-[#94A3B8] mt-0.5">{category}</p>}
                       </div>
+                      {/* 삭제 버튼 — hover 시에만 보이고, 행 클릭과 충돌 방지 */}
                       <button onClick={(e) => { e.stopPropagation(); handleRemove(id); }}
                         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-[#CBD5E1] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition-all">
                         <IconX />
@@ -507,6 +519,7 @@ function BookmarkSection() {
             <div className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden">
               <ul>
                 {filteredGap.map((b) => {
+                  // content 필드가 JSON 문자열일 수 있으므로 파싱 시도
                   let parsedContent = null;
                   try { parsedContent = b.content ? JSON.parse(b.content) : null; } catch {}
                   const summary = parsedContent?.backgroundAndGap ?? parsedContent?.description ?? "";
@@ -546,9 +559,11 @@ function BookmarkSection() {
   );
 }
 
-// ─── 관심 키워드 ───────────────────────────────────────────
+// ─── 관심 키워드 섹션 ──────────────────────────────────────
+// localStorage에 저장하는 관심 키워드 관리 — 클릭 시 Research 페이지로 자동 검색
 function KeywordSection() {
   const STORAGE_KEY = "clip_interest_keywords";
+  // 초기 상태를 localStorage에서 로드 (파싱 실패 시 빈 배열)
   const [keywords, setKeywords] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? []; }
     catch { return []; }
@@ -559,6 +574,7 @@ function KeywordSection() {
 
   const addKeyword = () => {
     const kw = input.trim();
+    // 빈 값이거나 이미 있는 키워드면 무시
     if (!kw || keywords.includes(kw)) return;
     const next = [...keywords, kw];
     setKeywords(next);
@@ -572,6 +588,7 @@ function KeywordSection() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   };
 
+  // 키워드 클릭 시 바로 이동하지 않고 확인 다이얼로그 먼저 띄움
   const goToSearch = (kw) => {
     setConfirmKw(kw);
   };
@@ -584,7 +601,7 @@ function KeywordSection() {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* 추가 입력 */}
+      {/* 키워드 추가 입력 — Enter로도 추가 가능 */}
       <div className="flex gap-3">
         <div className="flex-1 flex items-center gap-2 bg-white rounded-2xl border border-[#E2E8F0] px-4 py-3 focus-within:border-[#1D4ED8] shadow-sm transition-all">
           <IconSearch />
@@ -615,6 +632,7 @@ function KeywordSection() {
                 className="flex items-center gap-1.5 px-3.5 py-2 bg-[#EEF2FF] rounded-full group cursor-pointer hover:bg-[#E0E7FF] transition-colors"
                 onClick={() => goToSearch(kw)}>
                 <span className="text-sm font-medium text-[#4F46E5]">{kw}</span>
+                {/* X 버튼 — 클릭이 부모의 goToSearch와 겹치지 않도록 stopPropagation */}
                 <button onClick={(e) => { e.stopPropagation(); removeKeyword(kw); }}
                   className="text-[#A5B4FC] hover:text-[#EF4444] transition-colors">
                   <IconX className="w-3 h-3" />
@@ -625,6 +643,7 @@ function KeywordSection() {
         </div>
       )}
 
+      {/* 검색 이동 전 확인 다이얼로그 */}
       {confirmKw && (
         <ConfirmDialog
           title="검색으로 이동"
@@ -638,7 +657,8 @@ function KeywordSection() {
   );
 }
 
-// ─── 메인 MyPage ───────────────────────────────────────────
+// ─── 마이페이지 메인 컴포넌트 ─────────────────────────────
+// 사이드바 메뉴 + 우측 콘텐츠 레이아웃
 const MENU = [
   { key: "account", label: "계정 설정", icon: <IconUser /> },
   { key: "bookmark", label: "북마크", icon: <IconBookmark /> },
@@ -651,6 +671,7 @@ function MyPage() {
   const [activeMenu, setActiveMenu] = useState("account");
   const [user, setUser] = useState(null);
 
+  // 마운트 시 유저 정보 로드 — 실패해도 페이지는 정상 표시
   useEffect(() => {
     usersApi.getInformation()
       .then(setUser)
@@ -668,7 +689,7 @@ function MyPage() {
       logout();
       navigate("/");
     } catch {
-      // silent fail — show nothing, user stays on page
+      // 탈퇴 실패 시 별도 UI 없이 조용히 처리 (사용자는 그대로 페이지에 남음)
     }
   };
 
@@ -681,7 +702,7 @@ function MyPage() {
   return (
     <div className="mx-auto max-w-screen-xl px-8 py-10 flex gap-8 min-h-[calc(100vh-64px)]">
 
-      {/* 사이드바 */}
+      {/* 왼쪽 사이드바 — 메뉴 + 하단 로그아웃 버튼 */}
       <aside className="w-52 shrink-0 flex flex-col justify-between">
         <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
           <ul>
@@ -709,7 +730,7 @@ function MyPage() {
         </button>
       </aside>
 
-      {/* 콘텐츠 */}
+      {/* 오른쪽 콘텐츠 — 선택된 메뉴에 따라 섹션 전환 */}
       <main className="flex-1 min-w-0">
         <h1 className="text-2xl font-bold text-[#173355] mb-6">{SECTION_TITLES[activeMenu]}</h1>
 

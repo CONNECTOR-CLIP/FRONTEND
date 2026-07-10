@@ -4,6 +4,7 @@ import { historyApi } from "@/api";
 
 const STORAGE_KEY = "clip_recent_searches";
 
+// 개발 환경에서만 목업 데이터를 초기값으로 사용 (API 연동 전 UI 확인용)
 const MOCK_HISTORY = import.meta.env.DEV
   ? [
       {
@@ -34,6 +35,7 @@ const MOCK_HISTORY = import.meta.env.DEV
     ]
   : [];
 
+// localStorage에서 검색 기록 로드 — 없거나 파싱 실패 시 목업 반환
 function loadRecent() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -48,6 +50,7 @@ function saveRecent(list) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
+// 서버 응답 구조가 다를 수 있어 여러 필드명 fallback 처리
 function normalizeHistory(data) {
   const list = data?.data ?? data?.content ?? data?.histories ?? data;
   if (!Array.isArray(list)) return [];
@@ -66,7 +69,7 @@ function normalizeHistory(data) {
         searchedAt: item.searchedAt ?? item.createdAt ?? item.updatedAt,
       };
     })
-    .filter((item) => item.query);
+    .filter((item) => item.query); // 검색어 없는 항목 제거
 }
 
 function formatDate(iso) {
@@ -78,6 +81,7 @@ function formatDate(iso) {
   });
 }
 
+// 검색 기록 페이지 — 과거 검색 키워드 목록을 보여주고 클릭 시 로드맵으로 이동
 function SearchHistory() {
   const navigate = useNavigate();
   const [recents, setRecents] = useState(loadRecent);
@@ -91,6 +95,7 @@ function SearchHistory() {
       try {
         const data = await historyApi.getHistory();
         const serverHistory = normalizeHistory(data);
+        // 서버에 데이터가 있을 때만 교체 (없으면 로컬 데이터 유지)
         if (!ignore && serverHistory.length > 0) {
           setRecents(serverHistory);
           saveRecent(serverHistory);
@@ -110,6 +115,7 @@ function SearchHistory() {
   }, []);
 
   const trimmed = filterQuery.trim();
+  // 검색어가 없거나 기록이 없으면 검색 버튼 비활성화
   const searchDisabled = !trimmed || recents.length === 0;
 
   const filtered = recents.filter(
@@ -138,6 +144,7 @@ function SearchHistory() {
     }
   };
 
+  // 기록 클릭 시 해당 키워드로 로드맵 페이지 이동
   const goToRoadmap = (item) => {
     navigate("/roadmap", { state: { query: item.query } });
   };
@@ -163,7 +170,7 @@ function SearchHistory() {
         )}
       </div>
 
-      {/* 검색창 */}
+      {/* 기록 내 검색창 */}
       <form
         onSubmit={(e) => e.preventDefault()}
         className="flex gap-3 max-w-2xl"
@@ -215,13 +222,14 @@ function SearchHistory() {
         </button>
       </form>
 
+      {/* API 실패 시 경고 배너 */}
       {loadError && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           {loadError}
         </div>
       )}
 
-      {/* 결과 영역 */}
+      {/* 기록 목록 */}
       {recents.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 gap-3">
           <svg className="w-12 h-12 text-[#CBD5E1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,6 +242,7 @@ function SearchHistory() {
         <div className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden">
           <ul>
             {recents.map((item) => {
+              // 필터 적용 — CSS transition으로 숨김 처리해 자연스럽게 사라짐
               const visible =
                 !trimmed ||
                 item.query.toLowerCase().includes(trimmed.toLowerCase());
@@ -276,6 +285,7 @@ function SearchHistory() {
                         d="M9 5l7 7-7 7" />
                     </svg>
 
+                    {/* 삭제 버튼 — hover 시에만 보임, 클릭이 행 클릭과 겹치지 않도록 stopPropagation */}
                     <button
                       onClick={(e) => { e.stopPropagation(); removeRecent(item.id); }}
                       className="opacity-0 group-hover:opacity-100 p-1 text-[#CBD5E1] hover:text-[#EF4444] transition-all ml-1"

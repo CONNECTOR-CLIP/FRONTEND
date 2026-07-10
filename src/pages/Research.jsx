@@ -11,6 +11,7 @@ const DEFAULT_TAGS = [
 ];
 const STORAGE_KEY = "clip_recent_searches";
 
+// localStorage에서 최근 검색어 로드 — 파싱 실패 시 빈 배열 반환
 function loadRecent() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? [];
@@ -23,6 +24,7 @@ function saveRecent(list) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
+// 서버 응답 형태가 다를 수 있어 여러 필드명으로 정규화
 function normalizeRecentItems(data) {
   const list = data?.data ?? data?.content ?? data?.recentSearches ?? data;
   if (!Array.isArray(list)) return [];
@@ -41,9 +43,10 @@ function normalizeRecentItems(data) {
         searchedAt: item.searchedAt ?? item.createdAt ?? item.updatedAt,
       };
     })
-    .filter((item) => item.query);
+    .filter((item) => item.query); // 검색어 없는 항목 제거
 }
 
+// 트렌드 API 응답에서 키워드 문자열 배열만 추출
 function normalizeTrendTags(data) {
   const list = data?.data ?? data?.content ?? data?.keywords ?? data;
   if (!Array.isArray(list)) return [];
@@ -56,9 +59,11 @@ function normalizeTrendTags(data) {
     .filter(Boolean);
 }
 
+// 논문 검색 페이지 — 키워드 입력 → 서버 검색 → 로드맵으로 이동
 function Research() {
   const navigate = useNavigate();
   const { state } = useLocation();
+  // 홈 트렌딩 키워드 클릭 시 state.autoSearch로 진입하면 초기 검색어 자동 설정
   const [query, setQuery] = useState(state?.autoSearch ?? "");
   const [tags, setTags] = useState(DEFAULT_TAGS);
   const [focused, setFocused] = useState(false);
@@ -69,6 +74,7 @@ function Research() {
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
 
+  // 드롭다운 외부 클릭 감지 → 드롭다운 닫기
   useEffect(() => {
     function handleClickOutside(e) {
       if (
@@ -83,6 +89,7 @@ function Research() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // 마운트 시 서버에서 최근 검색어와 트렌드 태그 병렬 로드
   useEffect(() => {
     let ignore = false;
 
@@ -96,6 +103,7 @@ function Research() {
 
       if (recentResult.status === "fulfilled") {
         const serverRecents = normalizeRecentItems(recentResult.value);
+        // 서버 데이터가 있을 때만 로컬 기록을 덮어씀
         if (serverRecents.length > 0) {
           setRecents(serverRecents);
           saveRecent(serverRecents);
@@ -104,6 +112,7 @@ function Research() {
 
       if (trendResult.status === "fulfilled") {
         const trendTags = normalizeTrendTags(trendResult.value);
+        // 트렌드 키워드가 있으면 기본 태그를 교체 (최대 8개)
         if (trendTags.length > 0) setTags(["All", ...trendTags.slice(0, 8)]);
       }
     }
@@ -114,18 +123,19 @@ function Research() {
     };
   }, []);
 
+  // "All" 태그는 삭제 불가
   const removeTag = (tag) => {
     if (tag === "All") return;
     setTags((prev) => prev.filter((t) => t !== tag));
   };
 
+  // 최근 검색어 추가 — 동일 query가 이미 있으면 맨 앞으로 올리고 최대 20개 보관
   const addRecent = (q) => {
     const item = {
       id: Date.now().toString(),
       query: q,
       searchedAt: new Date().toISOString(),
     };
-    // 동일한 query가 있으면 제거 후 맨 앞에 추가, 최대 20개 보관
     const next = [item, ...recents.filter((r) => r.query !== q)].slice(0, 20);
     setRecents(next);
     saveRecent(next);
@@ -137,7 +147,7 @@ function Research() {
     saveRecent(next);
   };
 
-  // 홈 트렌딩 키워드 클릭으로 진입 시 자동 검색
+  // 홈에서 트렌딩 키워드를 클릭하고 넘어온 경우 자동으로 검색 실행
   useEffect(() => {
     if (state?.autoSearch) {
       const q = state.autoSearch.trim();
@@ -147,6 +157,7 @@ function Research() {
       setSearchError("");
       searchApi.searchPapers({ keyword: q })
         .then((searchResult) => {
+          // 기록은 fire-and-forget — 실패해도 검색 흐름에 영향 없음
           historyApi.saveHistory({ keyword: q }).catch(() => {});
           navigate("/roadmap", { state: { query: q, searchResult } });
         })
@@ -157,9 +168,11 @@ function Research() {
           setIsSearching(false);
         });
     }
+  // 마운트 시 1회만 실행
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 드롭다운에서 최근 검색어 선택 시 input에 채우기
   const selectRecent = (item) => {
     setQuery(item.query);
     setFocused(false);
@@ -190,6 +203,7 @@ function Research() {
     }
   };
 
+  // 포커스 상태이고 최근 검색어가 있을 때만 드롭다운 표시
   const showDropdown = focused && recents.length > 0;
 
   return (
@@ -201,6 +215,7 @@ function Research() {
       <div className="w-full max-w-170 flex flex-col items-center gap-4">
         <div className="relative w-full">
           <form onSubmit={handleSubmit}>
+            {/* 드롭다운이 열릴 때 검색창 하단 모서리를 사각형으로 변경해 자연스럽게 연결 */}
             <div
               onClick={() => inputRef.current?.focus()}
               className={`flex items-center gap-3 w-full bg-white px-5 py-3.5 cursor-text transition-all
@@ -253,7 +268,7 @@ function Research() {
             </div>
           </form>
 
-          {/* 최근 검색 드롭다운 (최대 5개) */}
+          {/* 최근 검색 드롭다운 — 최대 5개, mouseDown으로 처리해 blur보다 먼저 실행 */}
           {showDropdown && (
             <div
               ref={dropdownRef}
@@ -281,6 +296,7 @@ function Research() {
                         d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span className="flex-1 text-sm text-[#334155]">{item.query}</span>
+                    {/* 삭제 버튼 — 클릭 시 input blur 방지를 위해 mouseDown 사용 */}
                     <button
                       onMouseDown={(e) => { e.preventDefault(); removeRecent(item.id); }}
                       className="opacity-0 group-hover:opacity-100 text-[#CBD5E1] hover:text-[#94A3B8] transition-all"
@@ -303,7 +319,7 @@ function Research() {
           </p>
         )}
 
-        {/* 필터 태그 */}
+        {/* 필터 태그 — 트렌드 API 응답으로 동적 갱신됨 */}
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-2 justify-center">
             {tags.map((tag) => (

@@ -14,7 +14,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-/* ─── 샘플 데이터 (API로 수신 연결 필요) ─── */
+// API 연동 전 UI 확인용 샘플 데이터 — 실제 서비스에서는 API 응답으로 대체됨
 const SAMPLE_DATA = {
   version: "1.0",
   generated_at: "2026-04-15T18:18:22.057044+00:00",
@@ -279,7 +279,7 @@ const SAMPLE_DATA = {
   ],
 };
 
-/* ─── Data Parsing ─── */
+// API 응답을 내부 그래프 데이터 구조로 변환
 function parseData(data) {
   return (data?.roots ?? []).map((root) => ({
     id: root.arxiv_primary_category,
@@ -297,6 +297,7 @@ function parseData(data) {
   }));
 }
 
+// 서버 응답 형태가 다를 수 있어 roots 위치를 여러 경로에서 탐색
 function resolveRoadmapData(data) {
   return (
     data?.roots ? data :
@@ -307,7 +308,7 @@ function resolveRoadmapData(data) {
   );
 }
 
-/* ─── Layout Constants ─── */
+// ─── 레이아웃 상수 ───────────────────────────────────────
 const ROOT_W = 120;
 const ROOT_H = 120;
 const TOPIC_W = 156;
@@ -315,9 +316,9 @@ const TOPIC_H = 40;
 const PAPER_W = 160;
 const PAPER_H = 72;
 const TOPIC_RADIUS = 350;
-const SPREAD_ANGLE = Math.PI * 1.2; // 216° 부채꼴
+const SPREAD_ANGLE = Math.PI * 1.2; // 216° 부채꼴로 논문 노드 배치
 
-/* ─── 엣지 방향 결정 (최적 handle 선택) ─── */
+// 두 노드의 좌표를 보고 가장 자연스러운 연결 방향(handle) 결정
 function getHandleDir(fromX, fromY, toX, toY) {
   const a = (Math.atan2(toY - fromY, toX - fromX) * 180) / Math.PI;
   if (a > -45 && a <= 45) return { src: "right", tgt: "left" };
@@ -326,7 +327,7 @@ function getHandleDir(fromX, fromY, toX, toY) {
   return { src: "top", tgt: "bottom" };
 }
 
-/* ─── 전방향 Handle (모든 노드 공용) ─── */
+// 모든 노드에 상하좌우 handle을 붙여 어느 방향으로든 엣지 연결 가능하게 함
 const ALL_DIRS = [
   { pos: Position.Top, dir: "top" },
   { pos: Position.Bottom, dir: "bottom" },
@@ -355,7 +356,9 @@ function AllHandles() {
   ));
 }
 
-/* ─── Custom Nodes ─── */
+// ─── 커스텀 노드 컴포넌트 ────────────────────────────────
+
+// 카테고리 루트 노드 (원형, 파란색)
 function RootNode({ data }) {
   return (
     <div
@@ -374,6 +377,7 @@ function RootNode({ data }) {
   );
 }
 
+// 토픽 노드 — 클릭 시 논문 펼치기, 펼쳐진 상태면 보라색으로 강조
 function TopicNode({ data }) {
   return (
     <div
@@ -389,6 +393,7 @@ function TopicNode({ data }) {
       <span className="text-white text-[11.5px] font-medium px-4 truncate">
         {data.label}
       </span>
+      {/* 논문 수 뱃지 */}
       {data.paperCount > 0 && (
         <div
           className={`absolute -top-2 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white
@@ -401,8 +406,10 @@ function TopicNode({ data }) {
   );
 }
 
+// 논문 노드 — 관련도 점수(score)에 따라 색상 다르게 표시
 function PaperNode({ data }) {
   const score = data.score ?? 0;
+  // 점수 0.8 이상: 초록, 0.5 이상: 노랑, 미만: 빨강
   const scoreStyle =
     score >= 0.8
       ? "text-emerald-600 bg-emerald-50 border-emerald-200"
@@ -425,6 +432,7 @@ function PaperNode({ data }) {
           arXiv:{data.paperId}
         </p>
       )}
+      {/* score가 0.1보다 낮으면 표시 생략 (노이즈 제거) */}
       {score > 0.1 && (
         <div className="flex items-center gap-1.5 mt-1">
           <span
@@ -447,7 +455,7 @@ const nodeTypes = {
   paperNode: PaperNode,
 };
 
-/* ─── 초기 그래프 빌드 (root + 방사형 topic) ─── */
+// 루트 + 방사형 토픽 노드 초기 배치 생성
 function buildInitialGraph(root) {
   const n = root.topics.length;
   const topicAngles = {};
@@ -465,6 +473,7 @@ function buildInitialGraph(root) {
 
   const edges = [];
 
+  // 토픽 노드를 원형으로 균등 배치
   root.topics.forEach((topic, i) => {
     const angle = (2 * Math.PI * i) / n - Math.PI / 2;
     topicAngles[topic.id] = angle;
@@ -496,7 +505,7 @@ function buildInitialGraph(root) {
   return { nodes, edges, topicAngles };
 }
 
-/* ─── Topic 클릭 시 paper 노드/엣지 생성 ─── */
+// 토픽 클릭 시 논문 노드와 엣지를 부채꼴 형태로 생성
 function buildExpansion(topic, angle, paperMap = {}) {
   const papers = topic.papers;
   if (!papers.length) return { nodes: [], edges: [] };
@@ -505,13 +514,14 @@ function buildExpansion(topic, angle, paperMap = {}) {
   const tx = Math.cos(angle) * TOPIC_RADIUS;
   const ty = Math.sin(angle) * TOPIC_RADIUS;
 
-  // paper 수에 따라 반경 동적 조정 (겹침 방지)
+  // 논문이 많을수록 반경을 키워 겹치지 않게 조정
   const paperRadius = Math.max(180, (n * (PAPER_W + 20)) / SPREAD_ANGLE);
 
   const nodes = [];
   const edges = [];
 
   papers.forEach((paper, i) => {
+    // 논문 1개면 토픽 방향 그대로, 여러 개면 부채꼴로 분산
     const paperAngle =
       n === 1 ? angle : angle - SPREAD_ANGLE / 2 + (SPREAD_ANGLE * i) / (n - 1);
     const px = tx + Math.cos(paperAngle) * paperRadius;
@@ -546,7 +556,8 @@ function buildExpansion(topic, angle, paperMap = {}) {
   return { nodes, edges };
 }
 
-/* ─── 공유 상태 훅 (ReactFlowProvider 내부에서만 호출) ─── */
+// ReactFlow 상태 및 노드 클릭 이벤트를 관리하는 공유 훅
+// ReactFlowProvider 내부에서만 호출 가능 (useReactFlow 사용)
 function useRoadmapFlow(root, onPaperClick, paperMap = {}) {
   const { fitView } = useReactFlow();
   const [expandedId, setExpandedId] = useState(null);
@@ -560,6 +571,7 @@ function useRoadmapFlow(root, onPaperClick, paperMap = {}) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
 
+  // root가 바뀌면 그래프 초기화
   useEffect(() => {
     setExpandedId(null);
     setNodes(initNodes);
@@ -568,13 +580,14 @@ function useRoadmapFlow(root, onPaperClick, paperMap = {}) {
 
   const onNodeClick = useCallback((_, node) => {
     if (node.type === "topicNode") {
+      // 같은 토픽 클릭 시 토글 (접기/펼치기)
       setExpandedId((prev) => (prev === node.id ? null : node.id));
     } else if (node.type === "paperNode" && onPaperClick) {
       onPaperClick(node.data.paperId, node.data.topicLabel);
     }
   }, [onPaperClick]);
 
-  // expandedId 변경 → 노드/엣지 동기화
+  // expandedId 변경 시 논문 노드/엣지 동기화
   useEffect(() => {
     const topic = expandedId
       ? root.topics.find((t) => t.id === expandedId)
@@ -599,6 +612,7 @@ function useRoadmapFlow(root, onPaperClick, paperMap = {}) {
         .filter((e) => e.id.startsWith("e-root-"))
         .map((e) => ({
           ...e,
+          // 펼쳐진 토픽은 엣지를 강조 표시
           style: {
             stroke: e.target === expandedId ? "#6366F1" : "#CBD5E1",
             strokeWidth: e.target === expandedId ? 2.5 : 1.5,
@@ -609,7 +623,7 @@ function useRoadmapFlow(root, onPaperClick, paperMap = {}) {
     ]);
   }, [expandedId, root, topicAngles, paperMap, setNodes, setEdges]);
 
-  // 펼쳐진 topic 영역으로 카메라 포커스
+  // 토픽 펼쳐지면 해당 영역으로 카메라 이동 (80ms delay로 노드 렌더링 후 실행)
   useEffect(() => {
     const topic = expandedId
       ? root.topics.find((t) => t.id === expandedId)
@@ -630,17 +644,18 @@ function useRoadmapFlow(root, onPaperClick, paperMap = {}) {
   return { nodes, edges, onNodesChange, onEdgesChange, onNodeClick };
 }
 
-/* ─── Chart colors ─── */
+// 점유율 바 차트 색상 팔레트
 const CHART_COLORS = [
   "#F59E0B", "#EAB308", "#EF4444", "#06B6D4",
   "#8B5CF6", "#10B981", "#3B82F6", "#F97316",
 ];
 
+// GAP 분석 결과 JSON 파싱 — 마크다운 코드블록이 포함되어 있을 수 있어 제거 후 파싱
 function parseGapContent(content) {
   if (!content) return [];
   const tryParse = (val) => {
     if (typeof val !== "string") return val;
-    // 마크다운 코드블록 제거 (```json ... ``` 또는 ``` ... ```)
+    // ```json ... ``` 형식 제거
     const stripped = val.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
     try { return JSON.parse(stripped); } catch { return null; }
   };
@@ -657,6 +672,7 @@ function parseGapContent(content) {
     noveltyAssessment: item.novelty_assessment ?? null,
   });
 
+  // 응답 배열 구조가 다를 수 있어 여러 키로 시도
   if (Array.isArray(parsed)) return parsed.map(normalise);
   if (Array.isArray(parsed?.future_work_proposals)) return parsed.future_work_proposals.map(normalise);
   if (Array.isArray(parsed?.future_work)) return parsed.future_work.map(normalise);
@@ -665,7 +681,7 @@ function parseGapContent(content) {
   return [{ title: "분석 결과", description: content }];
 }
 
-/* ─── 북마크 아이콘 ─── */
+// 북마크 아이콘 — filled 여부에 따라 채워진/빈 아이콘 전환
 function BookmarkIcon({ filled }) {
   return filled ? (
     <svg className="w-4 h-4 text-[#4F46E5]" viewBox="0 0 24 24" fill="currentColor">
@@ -678,7 +694,7 @@ function BookmarkIcon({ filled }) {
   );
 }
 
-/* ─── 논문 선택 모달 ─── */
+// 갭 분석 실행할 논문을 선택하는 모달 (10~15개 권장)
 function PaperSelectModal({ papers, selectedIds, onToggle, onConfirm, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -698,7 +714,7 @@ function PaperSelectModal({ papers, selectedIds, onToggle, onConfirm, onClose })
           <p className="text-xs text-[#64748B] mt-1.5">퓨쳐워크를 탐색할 논문 10~15개를 선택해주세요.</p>
         </div>
 
-        {/* Paper list */}
+        {/* 논문 목록 */}
         <div className="flex-1 overflow-y-auto px-4 py-2 paper-scroll">
           {papers.length === 0 && (
             <p className="text-xs text-[#94A3B8] text-center py-10">표시할 논문이 없습니다.</p>
@@ -749,8 +765,9 @@ function PaperSelectModal({ papers, selectedIds, onToggle, onConfirm, onClose })
   );
 }
 
-/* ─── 주제 상세 모달 ─── */
+// 갭 아이디어 상세 정보 모달
 function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
+  // 구조화된 필드가 있으면 섹션별로 나눠서 표시, 없으면 description으로 폴백
   const sections = item.backgroundAndGap || item.proposedDirection || item.expectedContribution
     ? [
         { label: "연구 공백", text: item.backgroundAndGap },
@@ -810,7 +827,7 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
   );
 }
 
-/* ─── 논문 사이드 패널 ─── */
+// 논문 클릭 시 오른쪽에서 슬라이드 인하는 상세 패널
 function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, onBookmark, onClose }) {
   const title = detail?.title ?? null;
   const topic = detail?.privaryCategory ?? detail?.categories ?? topicLabel ?? null;
@@ -819,6 +836,7 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
 
   return (
     <>
+      {/* 배경 클릭 시 패널 닫기 */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
         className="fixed top-0 right-0 h-full w-[400px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col border-l border-[#E2E8F0]"
@@ -860,7 +878,6 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
             </div>
           ) : (
             <>
-              {/* 토픽 */}
               {topic && (
                 <div>
                   <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">토픽</p>
@@ -869,16 +886,12 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
                   </span>
                 </div>
               )}
-
-              {/* 저자 */}
               {author && (
                 <div>
                   <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">저자</p>
                   <p className="text-xs text-[#475569]">{author}</p>
                 </div>
               )}
-
-              {/* 요약 */}
               {summary ? (
                 <div>
                   <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">요약</p>
@@ -893,7 +906,7 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
           )}
         </div>
 
-        {/* Footer — 원 논문 링크 */}
+        {/* Footer — arXiv 원문 링크 */}
         <div className="px-6 py-4 border-t border-[#F1F5F9]">
           <a
             href={`https://arxiv.org/abs/${paperId}`}
@@ -912,9 +925,9 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
   );
 }
 
-/* ─── Inner Flow (useReactFlow 사용) ─── */
+// 실제 ReactFlow를 렌더링하는 내부 컴포넌트 (ReactFlowProvider 내에서 사용)
 function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }) {
-  /* ── paperMap: paper_id → 검색결과 전체 데이터 ── */
+  // paper_id → 논문 전체 데이터 맵 (노드 렌더링 시 제목 표시용)
   const paperMap = useMemo(() => {
     const map = {};
     for (const p of papers) {
@@ -924,12 +937,12 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
     return map;
   }, [papers]);
 
-  /* ── 논문 사이드 패널 상태 ── */
   const [selectedPaper, setSelectedPaper] = useState(null); // { paperId, topicLabel }
   const [paperDetail, setPaperDetail] = useState(null);
   const [paperLoading, setPaperLoading] = useState(false);
   const [paperBookmarked, setPaperBookmarked] = useState(new Set());
 
+  // 논문 노드 클릭 시 상세 정보 API 호출
   const handlePaperClick = useCallback(async (paperId, topicLabel) => {
     setSelectedPaper({ paperId, topicLabel });
     setPaperDetail(null);
@@ -938,6 +951,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
       const detail = await paperApi.getPaperDetail(paperId);
       setPaperDetail(detail);
     } catch {
+      // API 실패 시 paperMap의 로컬 데이터로 폴백
       const local = paperMap[paperId];
       setPaperDetail(local ? {
         paperId,
@@ -952,6 +966,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
     }
   }, [paperMap]);
 
+  // 논문 북마크 토글 — 낙관적 UI 업데이트 후 API 실패 시 롤백
   const togglePaperBookmark = useCallback(async (paperId, title, category) => {
     const isBookmarked = paperBookmarked.has(paperId);
     setPaperBookmarked((prev) => {
@@ -970,6 +985,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
         });
       }
     } catch {
+      // 실패 시 이전 상태로 롤백
       setPaperBookmarked((prev) => {
         const next = new Set(prev);
         isBookmarked ? next.add(paperId) : next.delete(paperId);
@@ -983,7 +999,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
 
   const totalPapers = root.topics.reduce((s, t) => s + t.papers.length, 0);
 
-  /* ── 점유율 데이터 ── */
+  // 토픽별 논문 수 분포 데이터 (바 차트용)
   const distribution = useMemo(
     () =>
       root.topics
@@ -998,12 +1014,12 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   const distTotal = distribution.reduce((s, d) => s + d.count, 0);
   const distMax = Math.max(...distribution.map((d) => d.count), 1);
 
-  /* ── GAP 상태 ── */
+  // GAP 분석 관련 상태
   const [gapItems, setGapItems] = useState([]);
   const [gapLoading, setGapLoading] = useState(false);
   const [gapError, setGapError] = useState("");
   const [bookmarked, setBookmarked] = useState(new Set());
-  const [bookmarkIdMap, setBookmarkIdMap] = useState({}); // index → backend id
+  const [bookmarkIdMap, setBookmarkIdMap] = useState({}); // 로컬 인덱스 → 서버 북마크 ID
   const [showPaperModal, setShowPaperModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [detailItem, setDetailItem] = useState(null);
@@ -1016,6 +1032,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
     });
   }, []);
 
+  // 선택한 논문 ID로 GAP 분석 API 호출
   const runGapAnalysis = useCallback(async (ids) => {
     const paperIds = [...ids];
     setShowPaperModal(false);
@@ -1024,6 +1041,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
     setGapItems([]);
     try {
       const selectedPapers = papers.filter((p) => ids.has(p.paper_id ?? p.arxiv_id ?? ""));
+      // 선택 논문을 서버에 먼저 전달 (실패해도 갭 분석은 계속 진행)
       if (selectedPapers.length > 0) {
         await paperApi.selectPapers(selectedPapers).catch(() => {});
       }
@@ -1041,6 +1059,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
     runGapAnalysis(selectedIds);
   }, [selectedIds, runGapAnalysis]);
 
+  // GAP 아이디어 북마크 토글 — 낙관적 업데이트 후 서버 ID 저장
   const toggleBookmark = useCallback(async (i) => {
     const item = gapItems[i];
     if (!item) return;
@@ -1059,16 +1078,15 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           content: JSON.stringify(item),
           keyword: searchQuery ?? "",
         });
+        // 서버에서 받은 ID를 저장해두어야 나중에 삭제 시 사용 가능
         if (res?.id) setBookmarkIdMap((prev) => ({ ...prev, [i]: res.id }));
       } catch {}
     }
   }, [bookmarked, bookmarkIdMap, gapItems, searchQuery]);
 
-  /* 기존 GAP 결과 불러오기 */
-
   return (
     <div className="mx-auto max-w-screen-3xl px-8 py-8 flex flex-col gap-6">
-      {/* Header */}
+      {/* 헤더 — 검색 키워드가 있으면 강조 표시 */}
       <div>
         <h1 className="text-lg font-bold text-[#173355]">Research Roadmap</h1>
         <p className="mt-1 text-sm text-[#466084]">
@@ -1083,7 +1101,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
         </p>
       </div>
 
-      {/* Stats */}
+      {/* 통계 뱃지 */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2 bg-white rounded-xl border border-[#E2E8F0] px-4 py-2 shadow-sm">
           <div className="w-2 h-2 rounded-full bg-[#3B5BDB]" />
@@ -1112,13 +1130,14 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
         </span>
       </div>
 
+      {/* API 실패 경고 배너 */}
       {apiError && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           {apiError}
         </div>
       )}
 
-      {/* Graph */}
+      {/* ReactFlow 그래프 */}
       <div
         className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden"
         style={{ height: "calc(100vh - 260px)", minHeight: "500px" }}
@@ -1165,9 +1184,10 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           </ReactFlow>
         </div>
       </div>
-      {/* ─── 점유율 + GAP 추천 ─── */}
+
+      {/* 하단: 점유율 바 차트 + GAP 추천 */}
       <div className="flex gap-6">
-        {/* 점유율 */}
+        {/* 토픽별 논문 수 바 차트 */}
         <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6" style={{ flex: "0 0 44%" }}>
           <h3 className="text-sm font-semibold text-[#1E293B] mb-5">해당 계층까지의 점유율</h3>
           <div className="flex items-end justify-center gap-5 h-36 mb-4">
@@ -1176,6 +1196,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
                 <span className="text-xs font-semibold text-[#334155]">{d.count}</span>
                 <div
                   style={{
+                    // 최댓값 기준 상대 높이 계산, 최소 8px 보장
                     height: `${Math.max((d.count / distMax) * 112, 8)}px`,
                     backgroundColor: d.color,
                     width: "48px",
@@ -1201,10 +1222,11 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           </div>
         </div>
 
-        {/* CLIP 추천 아이디어 */}
+        {/* CLIP 갭 아이디어 추천 패널 */}
         <div className="flex-1 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-[#1E293B]">CLIP의 추천 아이디어</h3>
+            {/* 결과가 있을 때만 재추천 버튼 표시 */}
             {gapItems.length > 0 && (
               <button
                 onClick={() => setShowPaperModal(true)}
@@ -1216,7 +1238,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
             )}
           </div>
 
-          {/* 기본 상태 */}
+          {/* 초기 상태 — 아직 분석 안 함 */}
           {!gapLoading && !gapItems.length && !gapError && (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-6">
               <div className="mt-2">
@@ -1230,7 +1252,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
             </div>
           )}
 
-          {/* 로딩 */}
+          {/* 분석 중 로딩 스피너 */}
           {gapLoading && (
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
               <div className="w-6 h-6 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
@@ -1238,7 +1260,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
             </div>
           )}
 
-          {/* 에러 */}
+          {/* 에러 상태 */}
           {gapError && !gapLoading && (
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
               <p className="text-xs text-red-500">{gapError}</p>
@@ -1251,7 +1273,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
             </div>
           )}
 
-          {/* 결과 */}
+          {/* 분석 결과 목록 */}
           {!gapLoading && gapItems.length > 0 && (
             <div className="flex flex-col gap-2.5 overflow-y-auto paper-scroll" style={{ maxHeight: "280px" }}>
               {gapItems.map((item, i) => (
@@ -1269,6 +1291,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
                         {item.backgroundAndGap ?? item.description ?? item.content ?? ""}
                       </p>
                     </div>
+                    {/* 클릭이 행 클릭과 겹치지 않도록 stopPropagation */}
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleBookmark(i); }}
                       className="flex-shrink-0 p-0.5 mt-0.5"
@@ -1294,7 +1317,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
         />
       )}
 
-      {/* 주제 상세 모달 */}
+      {/* 갭 아이디어 상세 모달 */}
       {detailItem && (
         <TopicDetailModal
           item={detailItem.item}
@@ -1305,7 +1328,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
         />
       )}
 
-      {/* 논문 사이드 패널 */}
+      {/* 논문 상세 사이드 패널 */}
       {selectedPaper && (
         <PaperSidePanel
           paperId={selectedPaper.paperId}
@@ -1321,7 +1344,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   );
 }
 
-/* ─── Preview Flow Inner (Home page 임베드용, ReactFlowProvider 내부) ─── */
+// 홈 페이지 대시보드 내 로드맵 미리보기 컴포넌트 (인터랙션 최소화)
 function PreviewFlowInner({ root, onInit }) {
   const { nodes, edges, onNodesChange, onEdgesChange, onNodeClick } =
     useRoadmapFlow(root);
@@ -1339,6 +1362,7 @@ function PreviewFlowInner({ root, onInit }) {
       fitViewOptions={{ padding: 0.3 }}
       minZoom={0.1}
       maxZoom={2.5}
+      // 홈에서는 스크롤/패닝 비활성화 — 실수로 드래그되는 것 방지
       zoomOnScroll={false}
       panOnScroll={false}
       proOptions={{ hideAttribution: true }}
@@ -1348,15 +1372,19 @@ function PreviewFlowInner({ root, onInit }) {
   );
 }
 
-/* ─── Roadmap Preview (Home page에서 import하여 사용) ─── */
+// 홈 페이지에서 import하여 사용하는 로드맵 미리보기 컴포넌트
 export function RoadmapPreview({ onInit, onKeywordLoad }) {
   const [roadmapData, setRoadmapData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     async function loadLastRoadmap() {
+      setLoading(true);
+      setError(false);
       try {
-        // 1. 마지막 검색 키워드 확인 (서버 기록 → localStorage 순)
+        // 1단계: 마지막 검색 키워드 확인 (서버 기록 우선, 실패 시 localStorage)
         let lastKeyword = null;
         try {
           const histData = await historyApi.getHistory();
@@ -1372,28 +1400,33 @@ export function RoadmapPreview({ onInit, onKeywordLoad }) {
 
         if (lastKeyword) onKeywordLoad?.(lastKeyword);
 
+        // 키워드 없으면 샘플 데이터 표시
         if (!lastKeyword) {
           setRoadmapData(SAMPLE_DATA);
           return;
         }
 
-        // 2. 해당 키워드로 로드맵 API 호출
+        // 2단계: 마지막 키워드로 로드맵 API 호출
         const data = await roadmapApi.getRoadmap({ keyword: lastKeyword });
         const resolved = resolveRoadmapData(data);
-        setRoadmapData(resolved ?? SAMPLE_DATA);
+        if (resolved) {
+          setRoadmapData(resolved);
+        } else {
+          setError(true);
+        }
       } catch {
-        setRoadmapData(SAMPLE_DATA);
+        setError(true);
       } finally {
         setLoading(false);
       }
     }
     loadLastRoadmap();
-  }, []);
+  }, [retryCount]);
 
   const roots = useMemo(() => parseData(roadmapData ?? SAMPLE_DATA), [roadmapData]);
   const root = roots[0] ?? null;
 
-  if (loading || !root) {
+  if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -1408,6 +1441,46 @@ export function RoadmapPreview({ onInit, onKeywordLoad }) {
     );
   }
 
+  if (error) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center px-8">
+          <div className="w-14 h-14 rounded-full bg-[#FEF2F2] flex items-center justify-center">
+            <svg className="w-7 h-7 text-[#EF4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-semibold text-[#1E293B]">로드맵을 불러올 수 없어요</p>
+            <p className="text-xs text-[#94A3B8] leading-relaxed">
+              최근 로드맵을 가져오는 데 실패했습니다.<br />
+              잠시 후 다시 시도해 주세요.
+            </p>
+          </div>
+          <button
+            onClick={() => setRetryCount(c => c + 1)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#0060AD] text-white text-xs font-medium hover:bg-[#004f8f] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            다시 시도
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!root) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <p className="text-xs text-[#94A3B8]">로드맵 데이터가 없습니다.</p>
+      </div>
+    );
+  }
+
   return (
     <ReactFlowProvider>
       <PreviewFlowInner root={root} onInit={onInit} />
@@ -1415,15 +1488,18 @@ export function RoadmapPreview({ onInit, onKeywordLoad }) {
   );
 }
 
-/* ─── Roadmap Page ─── */
+// 로드맵 페이지 — 검색 결과나 API 응답으로 받은 로드맵 데이터를 시각화
 function Roadmap() {
   const { state } = useLocation();
   const searchQuery = state?.query ?? null;
+  // Research 페이지에서 넘어온 검색 결과가 있으면 우선 사용
   const initialData = resolveRoadmapData(state?.searchResult) ?? SAMPLE_DATA;
   const [roadmapData, setRoadmapData] = useState(initialData);
   const [apiError, setApiError] = useState("");
   const [apiPapers, setApiPapers] = useState([]);
   const roots = useMemo(() => parseData(roadmapData), [roadmapData]);
+
+  // root가 여럿이면 토픽을 하나로 합쳐 단일 루트처럼 표시
   const root = useMemo(() => {
     if (roots.length <= 1) return roots[0] ?? null;
     return {
@@ -1435,10 +1511,12 @@ function Roadmap() {
     };
   }, [roots]);
 
+  // 논문 데이터 우선순위: 검색 결과 → API 응답 → 로드맵 노드에서 추출
   const papers = useMemo(() => {
     const searchPapers = state?.searchResult?.papers;
     if (searchPapers?.length > 0) return searchPapers;
     if (apiPapers.length > 0) return apiPapers;
+    // 로드맵 노드에서 paper_id만 추출 (중복 제거)
     const seen = new Set();
     const list = [];
     for (const r of (roadmapData?.roots ?? [])) {
@@ -1459,6 +1537,7 @@ function Roadmap() {
     let ignore = false;
     const stateData = resolveRoadmapData(state?.searchResult);
 
+    // 검색 결과가 이미 있으면 API 재호출 불필요
     if (stateData) {
       setRoadmapData(stateData);
       setApiError("");
@@ -1485,6 +1564,7 @@ function Roadmap() {
         }
       } catch {
         if (!ignore) {
+          // API 실패 시 샘플 데이터로 폴백 + 경고 배너 표시
           setRoadmapData(SAMPLE_DATA);
           setApiError("로드맵 API 연결에 실패하여 샘플 데이터를 표시합니다.");
         }

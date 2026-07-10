@@ -11,6 +11,9 @@ import SignupPage from "@/pages/SignupPage";
 import SignupCompletePage from "@/pages/SignupCompletePage";
 import MyPage from "@/pages/MyPage";
 
+// 앱 전체 라우팅 구조 정의
+// LoginLayout: 비로그인 페이지 (랜딩, 회원가입)
+// MainLayout: 로그인 후 서비스 페이지 (홈, 검색, 로드맵 등)
 export const router = createBrowserRouter([
   {
     path: "/",

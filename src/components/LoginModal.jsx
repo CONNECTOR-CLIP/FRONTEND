@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { authApi } from "@/api";
 import useAuthStore from "@/store/useAuthStore";
 
+// 서버 응답 구조가 다를 수 있어 여러 필드명을 순서대로 시도
 function getToken(data) {
   return (
     data?.token ??
@@ -15,10 +16,14 @@ function getToken(data) {
   );
 }
 
+// 유저 객체 위치도 서버마다 다를 수 있으므로 fallback 처리
 function getUser(data) {
-  return data?.user ?? data?.member ?? data?.profile ?? data?.data?.user ?? data;
+  return (
+    data?.user ?? data?.member ?? data?.profile ?? data?.data?.user ?? data
+  );
 }
 
+// 에러 응답에서 사람이 읽을 수 있는 메시지만 추출
 function getErrorMessage(error) {
   return (
     error?.response?.data?.message ??
@@ -27,17 +32,20 @@ function getErrorMessage(error) {
   );
 }
 
+// 로그인 모달 — 이메일/비밀번호 로그인 + 소셜 로그인 버튼 포함
 function LoginModal({ onClose }) {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
   const [saveId, setSaveId] = useState(false);
   const [form, setForm] = useState({
+    // 아이디 저장 기능 — localStorage에 저장된 값이 있으면 초기값으로 사용
     email: localStorage.getItem("savedLoginId") ?? "",
     password: "",
   });
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 입력값 변경 시 에러 메시지 초기화
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setError("");
@@ -45,8 +53,18 @@ function LoginModal({ onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.email.trim() || !form.password) {
-      setError("아이디와 비밀번호를 입력해주세요.");
+
+    if (form.email.trim().length < 1 && form.password.length < 1) {
+      setError("아이디와 비밀번호를 모두 입력해주세요");
+      return;
+    }
+
+    if (form.email.trim().length < 1) {
+      setError("아이디를 입력해주세요");
+      return;
+    }
+    if (form.password.length < 1) {
+      setError("비밀번호를 입력해주세요");
       return;
     }
 
@@ -57,6 +75,7 @@ function LoginModal({ onClose }) {
         password: form.password,
       });
       const token = getToken(data);
+      // 아이디 저장 선택 여부에 따라 localStorage 갱신
       if (saveId) localStorage.setItem("savedLoginId", form.email.trim());
       else localStorage.removeItem("savedLoginId");
       setAuth({ user: getUser(data), token });
@@ -74,6 +93,7 @@ function LoginModal({ onClose }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onClose}
     >
+      {/* 모달 내부 클릭은 닫힘 방지 */}
       <div
         className="bg-white rounded-2xl w-[620px] px-10 py-10 flex flex-col shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -110,6 +130,7 @@ function LoginModal({ onClose }) {
           </div>
           <div className="flex items-center gap-4 justify-between mb-[22px]">
             <div className="flex gap-[12px]">
+              {/* 커스텀 라디오 버튼 형태의 아이디 저장 토글 */}
               <button
                 type="button"
                 onClick={() => setSaveId(!saveId)}
@@ -156,8 +177,8 @@ function LoginModal({ onClose }) {
           <div className="flex-1 h-px bg-gray-200" />
         </div>
 
+        {/* 소셜 로그인 버튼 — 현재 UI만 있고 실제 OAuth 연동은 추후 처리 */}
         <div className="flex flex-col gap-3 ">
-          {/* 구글 */}
           <button className="flex flex-1 items-center justify-center gap-2 h-[40px] border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
             <svg width="18" height="40" viewBox="0 0 48 48">
               <path
@@ -180,7 +201,6 @@ function LoginModal({ onClose }) {
             <span className="text-sm text-gray-700">구글로 시작하기</span>
           </button>
 
-          {/* 네이버 */}
           <button className="flex overflow-hidden items-center justify-center gap-1.5 rounded-lg h-[40px] hover:opacity-90 transition-opacity bg-[#03A94D]">
             <span className="text-white font-extrabold text-base leading-none">
               N
@@ -190,7 +210,6 @@ function LoginModal({ onClose }) {
             </span>
           </button>
 
-          {/* 카카오 */}
           <button className="flex flex-1 items-center justify-center gap-2 h-[40px] bg-[#FEE500] rounded-lg hover:bg-[#f0d800] transition-colors">
             <svg width="18" height="40" viewBox="0 0 24 24" fill="#3C1E1E">
               <path d="M12 3C6.477 3 2 6.477 2 10.5c0 2.55 1.463 4.792 3.68 6.18-.162.57-.588 2.07-.673 2.39-.106.394.144.39.303.284.125-.083 1.98-1.342 2.78-1.882.613.09 1.244.138 1.91.138 5.523 0 10-3.477 10-7.5S17.523 3 12 3z" />
@@ -202,7 +221,7 @@ function LoginModal({ onClose }) {
         </div>
 
         <p className="text-center text-sm text-[#64748B] mt-4">
-          계정이 없으신가요?{" "}
+          계정이 없으신가요? {/* 모달 닫고 회원가입 페이지로 이동 */}
           <span
             onClick={() => {
               onClose();

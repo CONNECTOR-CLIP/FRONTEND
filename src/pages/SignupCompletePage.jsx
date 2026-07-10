@@ -1,8 +1,10 @@
 import { useLocation, useNavigate } from "react-router-dom";
 
+// 회원가입 완료 페이지 — SignupPage에서 navigate 시 state로 닉네임을 전달받음
 function SignupCompletePage() {
   const navigate = useNavigate();
   const { state } = useLocation();
+  // 직접 URL로 접근하면 state가 없으므로 기본값 처리
   const nickname = state?.nickname ?? "OO";
 
   return (
@@ -10,6 +12,7 @@ function SignupCompletePage() {
       <div className="bg-white/70 backdrop-blur-sm rounded-2xl w-[320px] px-10 py-10 flex flex-col items-center gap-6 shadow-xl">
         <p className="text-sm text-gray-400">회원가입</p>
 
+        {/* 체크마크 아이콘 */}
         <div className="w-14 h-14 rounded-full bg-[#EEF2FF] flex items-center justify-center">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
             <path
