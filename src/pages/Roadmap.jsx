@@ -1376,9 +1376,13 @@ function PreviewFlowInner({ root, onInit }) {
 export function RoadmapPreview({ onInit, onKeywordLoad }) {
   const [roadmapData, setRoadmapData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     async function loadLastRoadmap() {
+      setLoading(true);
+      setError(false);
       try {
         // 1단계: 마지막 검색 키워드 확인 (서버 기록 우선, 실패 시 localStorage)
         let lastKeyword = null;
@@ -1405,20 +1409,24 @@ export function RoadmapPreview({ onInit, onKeywordLoad }) {
         // 2단계: 마지막 키워드로 로드맵 API 호출
         const data = await roadmapApi.getRoadmap({ keyword: lastKeyword });
         const resolved = resolveRoadmapData(data);
-        setRoadmapData(resolved ?? SAMPLE_DATA);
+        if (resolved) {
+          setRoadmapData(resolved);
+        } else {
+          setError(true);
+        }
       } catch {
-        setRoadmapData(SAMPLE_DATA);
+        setError(true);
       } finally {
         setLoading(false);
       }
     }
     loadLastRoadmap();
-  }, []);
+  }, [retryCount]);
 
   const roots = useMemo(() => parseData(roadmapData ?? SAMPLE_DATA), [roadmapData]);
   const root = roots[0] ?? null;
 
-  if (loading || !root) {
+  if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -1429,6 +1437,46 @@ export function RoadmapPreview({ onInit, onKeywordLoad }) {
           </svg>
           <p className="text-xs text-[#94A3B8]">로드맵 불러오는 중...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center px-8">
+          <div className="w-14 h-14 rounded-full bg-[#FEF2F2] flex items-center justify-center">
+            <svg className="w-7 h-7 text-[#EF4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-semibold text-[#1E293B]">로드맵을 불러올 수 없어요</p>
+            <p className="text-xs text-[#94A3B8] leading-relaxed">
+              최근 로드맵을 가져오는 데 실패했습니다.<br />
+              잠시 후 다시 시도해 주세요.
+            </p>
+          </div>
+          <button
+            onClick={() => setRetryCount(c => c + 1)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#0060AD] text-white text-xs font-medium hover:bg-[#004f8f] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            다시 시도
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!root) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <p className="text-xs text-[#94A3B8]">로드맵 데이터가 없습니다.</p>
       </div>
     );
   }
