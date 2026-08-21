@@ -51,7 +51,7 @@ function Navbar() {
               onClick={() => scrollToSection("research")}
               className="text-sm hover:text-black"
             >
-              Team Blog
+              Research
             </button>
             <button
               onClick={() => scrollToSection("Team Blog")}

@@ -2,12 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "@/api";
 
-// 임시 중복 체크용 목록 — 실제 서비스에선 서버 API로 대체 필요
-const USED_IDS = ["admin", "user123", "clip"];
-const USED_NICKNAMES = ["관리자", "운영자", "clip"];
-const USED_EMAILS = ["test@test.com", "admin@clip.com"];
-
-// 회원가입 페이지 — 아이디/비밀번호/닉네임/이메일 입력 및 이메일 인증 포함
 function SignupPage() {
   const navigate = useNavigate();
   const [emailVerified, setEmailVerified] = useState(false);
@@ -32,14 +26,12 @@ function SignupPage() {
     email: "",
   });
 
-  // 각 필드별 유효성 검사 함수 모음
   const validators = {
     id: (v) => {
       if (/[^a-zA-Z0-9가-힣]/.test(v))
         return "특수문자가 들어있습니다. 특수문자를 제외해주세요.";
       if (v.length < 4) return "아이디는 4자 이상이어야 합니다.";
       if (v.length > 20) return "아이디는 20자 이하여야 합니다.";
-      if (USED_IDS.includes(v)) return "이미 사용 중인 아이디입니다.";
       return "";
     },
     password: (v) => {
@@ -47,7 +39,6 @@ function SignupPage() {
         return "8~20자, 특수문자 1개를 포함해주세요.";
       return "";
     },
-    // passwordConfirm은 form 전체를 받아 password와 비교
     passwordConfirm: (v, f) => {
       if (v !== f.password) return "비밀번호가 일치하지 않습니다.";
       return "";
@@ -55,13 +46,11 @@ function SignupPage() {
     nickname: (v) => {
       if (v.length < 2) return "닉네임은 2자 이상이어야 합니다.";
       if (v.length > 20) return "닉네임은 20자 이하여야 합니다.";
-      if (USED_NICKNAMES.includes(v)) return "이미 사용 중인 닉네임입니다.";
       return "";
     },
     email: (v) => {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
         return "정확한 이메일을 입력해주세요.";
-      if (USED_EMAILS.includes(v)) return "이미 사용 중인 이메일입니다.";
       return "";
     },
   };
@@ -265,20 +254,6 @@ function SignupPage() {
             )}
             {emailSentMsg && !emailVerified && (
               <span className="text-xs text-blue-500">{emailSentMsg}</span>
-            )}
-            {/* 테스트용 인증 완료 버튼 — 실제 이메일 링크 없이 인증 상태를 강제로 통과 */}
-            {emailSent && !emailVerified && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEmailVerified(true);
-                  setEmailSentMsg("");
-                  setEmailVerifyError("");
-                }}
-                className="text-xs text-[#0060AD] underline text-left"
-              >
-                인증 완료 (테스트용)
-              </button>
             )}
             {emailVerified && (
               <span className="text-xs text-green-500">
