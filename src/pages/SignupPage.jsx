@@ -140,10 +140,11 @@ function SignupPage() {
       setErrors((prev) => ({ ...prev, email: emailErr }));
       return;
     }
+    // 이메일 발송/인증 API 연동 전까지 형식 검사만 통과하면 임시로 인증 완료 처리
     setEmailSent(true);
-    setEmailVerified(false);
+    setEmailVerified(true);
     setEmailVerifyError("");
-    setEmailSentMsg("인증 메일을 발송했습니다.");
+    setEmailSentMsg("");
   };
 
   // 에러 여부에 따라 input 테두리 색상 변경
