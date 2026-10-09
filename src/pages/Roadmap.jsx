@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { useLocation } from "react-router-dom";
 import { roadmapApi, gapApi, paperApi, bookmarksApi, historyApi } from "@/api";
 import AnalysisProgressPanel from "@/components/AnalysisProgressPanel";
+import { EvaluationBadges, ProposalComparisonTable, hasEvaluation } from "@/components/ProposalEvaluation";
 import {
   ReactFlow,
   Background,
@@ -698,9 +699,30 @@ function parseGapContent(content) {
     noveltyAssessment: item.novelty_assessment ?? null,
   });
 
+  // CoT4 결과는 제안과 같은 순서로 하나씩, CoT5 결과는 CoT4를 통과한 제안만 있으므로 제목(idea_title)으로 맞춘다.
+  // 두 단계 모두 proposed_direction 첫 줄로 같은 제목을 만든다.
+  const cot4Results = parsed?.CoT4?.results ?? [];
+  const cot5 = parsed?.CoT5 ?? null;
+  const cot5Results = cot5?.results ?? [];
+  const withEvaluation = (item, i) => {
+    const feasibility = cot4Results[i] ?? null;
+    const novelty = feasibility
+      ? cot5Results.find((r) => r.idea_title === feasibility.idea_title) ?? null
+      : null;
+    // CoT5 판정이 없을 때의 사유: 전체 건너뜀 / 이 제안만 CoT4에서 걸러짐
+    const noveltyMissingReason = !cot5
+      ? null
+      : cot5.status === "skipped"
+        ? "건너뜀"
+        : novelty
+          ? null
+          : "CoT4 미통과";
+    return { ...normalise(item), feasibility, novelty, noveltyMissingReason };
+  };
+
   // 응답 배열 구조가 다를 수 있어 여러 키로 시도
   if (Array.isArray(parsed)) return parsed.map(normalise);
-  if (Array.isArray(parsed?.future_work_proposals)) return parsed.future_work_proposals.map(normalise);
+  if (Array.isArray(parsed?.future_work_proposals)) return parsed.future_work_proposals.map(withEvaluation);
   if (Array.isArray(parsed?.future_work)) return parsed.future_work.map(normalise);
   if (Array.isArray(parsed?.recommendations)) return parsed.recommendations.map(normalise);
   if (Array.isArray(parsed?.ideas)) return parsed.ideas.map(normalise);
@@ -1047,6 +1069,8 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   // 단계별 진행 상황 (AI 서버 작업 상태) — 하단 왼쪽 "분석 과정" 패널에 표시
   const [gapJob, setGapJob] = useState(null);
   const [leftTab, setLeftTab] = useState("share");
+  // 오른쪽 결과 보기 방식 — 목록 / 비교표(CoT4·CoT5 판정을 제안별로 나란히)
+  const [resultView, setResultView] = useState("list");
   // 폴링 루프를 식별하는 토큰 — 새 분석을 시작하면 이전 루프가 멈춘다
   const pollTokenRef = useRef(0);
   // 페이지를 떠나면 폴링을 멈춘다. (StrictMode·HMR의 정리→재실행에서는 다시 true가 되므로 끊기지 않는다)
@@ -1355,9 +1379,30 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
         </div>
 
         {/* CLIP 갭 아이디어 추천 패널 */}
-        <div className="flex-1 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col">
+        <div className="flex-1 min-w-0 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-[#1E293B]">CLIP의 추천 아이디어</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-[#1E293B]">CLIP의 추천 아이디어</h3>
+              {/* 검증 결과(CoT4·CoT5)가 있으면 목록/비교표 전환 */}
+              {!gapLoading && hasEvaluation(gapItems) && (
+                <div className="flex items-center gap-1 bg-[#F1F5F9] rounded-lg p-0.5">
+                  {[
+                    { key: "list", label: "목록" },
+                    { key: "table", label: "비교표" },
+                  ].map((view) => (
+                    <button
+                      key={view.key}
+                      onClick={() => setResultView(view.key)}
+                      className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors ${
+                        resultView === view.key ? "bg-white text-[#1E293B] shadow-sm" : "text-[#64748B] hover:text-[#1E293B]"
+                      }`}
+                    >
+                      {view.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {/* 결과가 있을 때만 재추천 버튼 표시 */}
             {gapItems.length > 0 && (
               <button
@@ -1407,8 +1452,16 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           )}
 
           {/* 분석 결과 목록 */}
-          {!gapLoading && gapItems.length > 0 && (
-            <div className="flex flex-col gap-2.5 overflow-y-auto paper-scroll" style={{ maxHeight: "280px" }}>
+          {!gapLoading && gapItems.length > 0 && resultView === "table" && hasEvaluation(gapItems) && (
+            <div className="overflow-y-auto paper-scroll" style={{ maxHeight: "560px" }}>
+              <ProposalComparisonTable
+                items={gapItems}
+                onSelect={(i) => setDetailItem({ item: gapItems[i], index: i })}
+              />
+            </div>
+          )}
+          {!gapLoading && gapItems.length > 0 && (resultView === "list" || !hasEvaluation(gapItems)) && (
+            <div className="flex flex-col gap-2.5 overflow-y-auto paper-scroll" style={{ maxHeight: "560px" }}>
               {gapItems.map((item, i) => (
                 <div
                   key={i}
@@ -1423,6 +1476,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
                       <p className="text-xs text-[#64748B] mt-1 line-clamp-1">
                         {item.backgroundAndGap ?? item.description ?? item.content ?? ""}
                       </p>
+                      <EvaluationBadges item={item} />
                     </div>
                     {/* 클릭이 행 클릭과 겹치지 않도록 stopPropagation */}
                     <button
