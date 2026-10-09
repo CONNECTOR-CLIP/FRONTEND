@@ -1,9 +1,22 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { useLocation } from "react-router-dom";
 import { roadmapApi, gapApi, paperApi, bookmarksApi, historyApi } from "@/api";
 import AnalysisProgressPanel from "@/components/AnalysisProgressPanel";
-import { EvaluationBadges, ProposalComparisonTable, hasEvaluation } from "@/components/ProposalEvaluation";
-import { FeasibilityEvidence, NoveltyEvidence } from "@/components/ProposalEvidence";
+import {
+  EvaluationBadges,
+  ProposalComparisonTable,
+  hasEvaluation,
+} from "@/components/ProposalEvaluation";
+import {
+  FeasibilityEvidence,
+  NoveltyEvidence,
+} from "@/components/ProposalEvidence";
 import { VerdictBadge } from "@/components/verdict";
 import {
   ReactFlow,
@@ -303,13 +316,15 @@ function parseData(data) {
 
 // 서버 응답 형태가 다를 수 있어 roots 위치를 여러 경로에서 탐색
 function resolveRoadmapData(data) {
-  return (
-    data?.roots ? data :
-    data?.data?.roots ? data.data :
-    data?.roadmap?.roots ? data.roadmap :
-    data?.data?.roadmap?.roots ? data.data.roadmap :
-    null
-  );
+  return data?.roots
+    ? data
+    : data?.data?.roots
+      ? data.data
+      : data?.roadmap?.roots
+        ? data.roadmap
+        : data?.data?.roadmap?.roots
+          ? data.data.roadmap
+          : null;
 }
 
 // ─── 레이아웃 상수 ───────────────────────────────────────
@@ -582,14 +597,17 @@ function useRoadmapFlow(root, onPaperClick, paperMap = {}) {
     setEdges(initEdges);
   }, [initNodes, initEdges, setNodes, setEdges]);
 
-  const onNodeClick = useCallback((_, node) => {
-    if (node.type === "topicNode") {
-      // 같은 토픽 클릭 시 토글 (접기/펼치기)
-      setExpandedId((prev) => (prev === node.id ? null : node.id));
-    } else if (node.type === "paperNode" && onPaperClick) {
-      onPaperClick(node.data.paperId, node.data.topicLabel);
-    }
-  }, [onPaperClick]);
+  const onNodeClick = useCallback(
+    (_, node) => {
+      if (node.type === "topicNode") {
+        // 같은 토픽 클릭 시 토글 (접기/펼치기)
+        setExpandedId((prev) => (prev === node.id ? null : node.id));
+      } else if (node.type === "paperNode" && onPaperClick) {
+        onPaperClick(node.data.paperId, node.data.topicLabel);
+      }
+    },
+    [onPaperClick],
+  );
 
   // expandedId 변경 시 논문 노드/엣지 동기화
   useEffect(() => {
@@ -650,8 +668,14 @@ function useRoadmapFlow(root, onPaperClick, paperMap = {}) {
 
 // 점유율 바 차트 색상 팔레트
 const CHART_COLORS = [
-  "#F59E0B", "#EAB308", "#EF4444", "#06B6D4",
-  "#8B5CF6", "#10B981", "#3B82F6", "#F97316",
+  "#F59E0B",
+  "#EAB308",
+  "#EF4444",
+  "#06B6D4",
+  "#8B5CF6",
+  "#10B981",
+  "#3B82F6",
+  "#F97316",
 ];
 
 // GAP 분석 결과 JSON 파싱 — 마크다운 코드블록이 포함되어 있을 수 있어 제거 후 파싱
@@ -661,7 +685,10 @@ const GAP_JOB_KEY = "clip.gapJob";
 
 function saveGapJob(jobId, query) {
   try {
-    sessionStorage.setItem(GAP_JOB_KEY, JSON.stringify({ jobId, query: query ?? "" }));
+    sessionStorage.setItem(
+      GAP_JOB_KEY,
+      JSON.stringify({ jobId, query: query ?? "" }),
+    );
   } catch {}
 }
 
@@ -685,14 +712,30 @@ function parseGapContent(content) {
   const tryParse = (val) => {
     if (typeof val !== "string") return val;
     // ```json ... ``` 형식 제거
-    const stripped = val.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
-    try { return JSON.parse(stripped); } catch { return null; }
+    const stripped = val
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/, "")
+      .trim();
+    try {
+      return JSON.parse(stripped);
+    } catch {
+      return null;
+    }
   };
   const parsed = tryParse(content);
   if (!parsed) return [{ title: "분석 결과", description: content }];
 
+  const firstSentence = (text) => {
+    if (!text) return null;
+    const m = text.match(/^.+?[.。]/);
+    return m ? m[0].trim() : text.slice(0, 80);
+  };
+
   const normalise = (item) => ({
-    title: item.title ?? item.proposed_direction?.slice(0, 60) ?? `제안 ${item.id ?? ""}`,
+    title:
+      item.title ??
+      firstSentence(item.proposed_direction) ??
+      `제안 ${item.id ?? ""}`,
     description: item.description ?? "",
     backgroundAndGap: item.background_and_gap ?? null,
     proposedDirection: item.proposed_direction ?? null,
@@ -709,7 +752,8 @@ function parseGapContent(content) {
   const withEvaluation = (item, i) => {
     const feasibility = cot4Results[i] ?? null;
     const novelty = feasibility
-      ? cot5Results.find((r) => r.idea_title === feasibility.idea_title) ?? null
+      ? (cot5Results.find((r) => r.idea_title === feasibility.idea_title) ??
+        null)
       : null;
     // CoT5 판정이 없을 때의 사유: 전체 건너뜀 / 이 제안만 CoT4에서 걸러짐
     const noveltyMissingReason = !cot5
@@ -724,9 +768,12 @@ function parseGapContent(content) {
 
   // 응답 배열 구조가 다를 수 있어 여러 키로 시도
   if (Array.isArray(parsed)) return parsed.map(normalise);
-  if (Array.isArray(parsed?.future_work_proposals)) return parsed.future_work_proposals.map(withEvaluation);
-  if (Array.isArray(parsed?.future_work)) return parsed.future_work.map(normalise);
-  if (Array.isArray(parsed?.recommendations)) return parsed.recommendations.map(normalise);
+  if (Array.isArray(parsed?.future_work_proposals))
+    return parsed.future_work_proposals.map(withEvaluation);
+  if (Array.isArray(parsed?.future_work))
+    return parsed.future_work.map(normalise);
+  if (Array.isArray(parsed?.recommendations))
+    return parsed.recommendations.map(normalise);
   if (Array.isArray(parsed?.ideas)) return parsed.ideas.map(normalise);
   return [{ title: "분석 결과", description: content }];
 }
@@ -734,45 +781,88 @@ function parseGapContent(content) {
 // 북마크 아이콘 — filled 여부에 따라 채워진/빈 아이콘 전환
 function BookmarkIcon({ filled }) {
   return filled ? (
-    <svg className="w-4 h-4 text-[#4F46E5]" viewBox="0 0 24 24" fill="currentColor">
+    <svg
+      className="w-4 h-4 text-[#4F46E5]"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
       <path d="M5 3h14a1 1 0 011 1v17.438l-8-3.2-8 3.2V4a1 1 0 011-1z" />
     </svg>
   ) : (
-    <svg className="w-4 h-4 text-[#94A3B8] hover:text-[#4F46E5] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 3h14a1 1 0 011 1v17.438l-8-3.2-8 3.2V4a1 1 0 011-1z" />
+    <svg
+      className="w-4 h-4 text-[#94A3B8] hover:text-[#4F46E5] transition-colors"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M5 3h14a1 1 0 011 1v17.438l-8-3.2-8 3.2V4a1 1 0 011-1z"
+      />
     </svg>
   );
 }
 
 // 갭 분석 실행할 논문을 선택하는 모달 (10~15개 권장)
-function PaperSelectModal({ papers, selectedIds, onToggle, onConfirm, onClose }) {
+function PaperSelectModal({
+  papers,
+  selectedIds,
+  onToggle,
+  onConfirm,
+  onClose,
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-[580px] max-w-[92vw] max-h-[75vh] flex flex-col"
-        style={{ animation: "scaleIn 0.18s ease-out" }}>
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl w-[580px] max-w-[92vw] max-h-[75vh] flex flex-col"
+        style={{ animation: "scaleIn 0.18s ease-out" }}
+      >
         {/* Header */}
         <div className="px-6 pt-5 pb-3 border-b border-[#F1F5F9]">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-[#1E293B]">논문선택</h3>
-            <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F1F5F9] transition-colors text-[#94A3B8]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            <button
+              onClick={onClose}
+              className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F1F5F9] transition-colors text-[#94A3B8]"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
-          <p className="text-xs text-[#64748B] mt-1.5">퓨쳐워크를 탐색할 논문 10~15개를 선택해주세요.</p>
+          <p className="text-xs text-[#64748B] mt-1.5">
+            퓨쳐워크를 탐색할 논문 10~15개를 선택해주세요.
+          </p>
         </div>
 
         {/* 논문 목록 */}
         <div className="flex-1 overflow-y-auto px-4 py-2 paper-scroll">
           {papers.length === 0 && (
-            <p className="text-xs text-[#94A3B8] text-center py-10">표시할 논문이 없습니다.</p>
+            <p className="text-xs text-[#94A3B8] text-center py-10">
+              표시할 논문이 없습니다.
+            </p>
           )}
           {papers.map((paper) => {
             const id = paper.paper_id ?? paper.arxiv_id ?? "";
             const isSelected = selectedIds.has(id);
-            const keywords = (paper.categories ?? paper.arxiv_categories ?? []).slice(0, 4);
+            const keywords = (
+              paper.categories ??
+              paper.arxiv_categories ??
+              []
+            ).slice(0, 4);
             return (
               <div
                 key={id}
@@ -786,13 +876,25 @@ function PaperSelectModal({ papers, selectedIds, onToggle, onConfirm, onClose })
                     {paper.title ?? `arXiv:${id}`}
                   </p>
                   {keywords.length > 0 && (
-                    <p className="text-xs text-[#64748B] mt-0.5 truncate">{keywords.join(" · ")}</p>
+                    <p className="text-xs text-[#64748B] mt-0.5 truncate">
+                      {keywords.join(" · ")}
+                    </p>
                   )}
                 </div>
                 <div className="flex-shrink-0 w-5 h-5 mt-0.5">
                   {isSelected && (
-                    <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    <svg
+                      className="w-5 h-5 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   )}
                 </div>
@@ -818,32 +920,50 @@ function PaperSelectModal({ papers, selectedIds, onToggle, onConfirm, onClose })
 // 갭 아이디어 상세 정보 모달
 function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
   // 구조화된 필드가 있으면 섹션별로 나눠서 표시, 없으면 description으로 폴백
-  const sections = item.backgroundAndGap || item.proposedDirection || item.expectedContribution
-    ? [
-        { label: "연구 공백", text: item.backgroundAndGap },
-        { label: "제안 방향", text: item.proposedDirection },
-        { label: "기대 기여", text: item.expectedContribution },
-      ]
-    : null;
+  const sections =
+    item.backgroundAndGap || item.proposedDirection || item.expectedContribution
+      ? [
+          { label: "연구 공백", text: item.backgroundAndGap },
+          { label: "제안 방향", text: item.proposedDirection },
+          { label: "기대 기여", text: item.expectedContribution },
+        ]
+      : null;
   // CoT4·CoT5 결과가 있으면 근거 탭을 보여준다
-  const hasEvidence = Boolean(item.feasibility || item.novelty || item.noveltyMissingReason);
+  const hasEvidence = Boolean(
+    item.feasibility || item.novelty || item.noveltyMissingReason,
+  );
   const [tab, setTab] = useState("content");
   const tabs = [
     { key: "content", label: "제안 내용" },
-    { key: "feasibility", label: "실현가능성 근거", verdict: item.feasibility?.classification },
-    { key: "novelty", label: "신규성 근거", verdict: item.novelty?.classification },
+    {
+      key: "feasibility",
+      label: "실현가능성 근거",
+      verdict: item.feasibility?.classification,
+    },
+    {
+      key: "novelty",
+      label: "신규성 근거",
+      verdict: item.novelty?.classification,
+    },
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className={`relative bg-white rounded-2xl shadow-2xl ${hasEvidence ? "w-[720px]" : "w-[580px]"} max-w-[92vw] p-6 max-h-[80vh] overflow-y-auto`}
-        style={{ animation: "scaleIn 0.18s ease-out" }}>
+      <div
+        className={`relative bg-white rounded-2xl shadow-2xl ${hasEvidence ? "w-[720px]" : "w-[580px]"} max-w-[92vw] p-6 max-h-[80vh] overflow-y-auto`}
+        style={{ animation: "scaleIn 0.18s ease-out" }}
+      >
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-bold text-[#1E293B] leading-snug">
               연구 제안 {index + 1}
             </h3>
+            {(item.title ?? item.name) && (
+              <p className="text-xs font-semibold text-[#334155] mt-1 leading-snug">
+                {item.title ?? item.name}
+              </p>
+            )}
             {item.referencePapers?.length > 0 && (
               <p className="text-[11px] text-[#6366F1] mt-1">
                 참조: {item.referencePapers.join(", ")}
@@ -859,9 +979,22 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
             <button onClick={onBookmark} className="p-1">
               <BookmarkIcon filled={isBookmarked} />
             </button>
-            <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#F1F5F9] text-[#94A3B8]">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            <button
+              onClick={onClose}
+              className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#F1F5F9] text-[#94A3B8]"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -873,7 +1006,9 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
                 key={t.key}
                 onClick={() => setTab(t.key)}
                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 -mb-px border-b-2 transition-colors ${
-                  tab === t.key ? "border-[#6366F1] text-[#1E293B]" : "border-transparent text-[#94A3B8] hover:text-[#475569]"
+                  tab === t.key
+                    ? "border-[#6366F1] text-[#1E293B]"
+                    : "border-transparent text-[#94A3B8] hover:text-[#475569]"
                 }`}
               >
                 {t.label}
@@ -885,15 +1020,24 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
         {hasEvidence && tab === "feasibility" ? (
           <FeasibilityEvidence feasibility={item.feasibility} />
         ) : hasEvidence && tab === "novelty" ? (
-          <NoveltyEvidence novelty={item.novelty} missingReason={item.noveltyMissingReason} />
+          <NoveltyEvidence
+            novelty={item.novelty}
+            missingReason={item.noveltyMissingReason}
+          />
         ) : sections ? (
           <div className="flex flex-col gap-3">
-            {sections.filter(s => s.text).map((s) => (
-              <div key={s.label}>
-                <p className="text-[11px] font-semibold text-[#6366F1] mb-1">{s.label}</p>
-                <p className="text-xs text-[#475569] leading-relaxed">{s.text}</p>
-              </div>
-            ))}
+            {sections
+              .filter((s) => s.text)
+              .map((s) => (
+                <div key={s.label}>
+                  <p className="text-[11px] font-semibold text-[#6366F1] mb-1">
+                    {s.label}
+                  </p>
+                  <p className="text-xs text-[#475569] leading-relaxed">
+                    {s.text}
+                  </p>
+                </div>
+              ))}
           </div>
         ) : (
           <p className="text-xs text-[#475569] leading-relaxed">
@@ -906,9 +1050,18 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
 }
 
 // 논문 클릭 시 오른쪽에서 슬라이드 인하는 상세 패널
-function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, onBookmark, onClose }) {
+function PaperSidePanel({
+  paperId,
+  topicLabel,
+  detail,
+  loading,
+  isBookmarked,
+  onBookmark,
+  onClose,
+}) {
   const title = detail?.title ?? null;
-  const topic = detail?.privaryCategory ?? detail?.categories ?? topicLabel ?? null;
+  const topic =
+    detail?.privaryCategory ?? detail?.categories ?? topicLabel ?? null;
   const summary = detail?.abstracts ?? null;
   const author = detail?.author ?? null;
 
@@ -932,15 +1085,28 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
             )}
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
-            <button onClick={onBookmark} className="p-1 rounded hover:bg-[#F1F5F9] transition-colors">
+            <button
+              onClick={onBookmark}
+              className="p-1 rounded hover:bg-[#F1F5F9] transition-colors"
+            >
               <BookmarkIcon filled={isBookmarked} />
             </button>
             <button
               onClick={onClose}
               className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F1F5F9] transition-colors text-[#94A3B8]"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -951,14 +1117,20 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
           {loading ? (
             <div className="flex flex-col gap-3">
               {[100, 80, 60, 90, 70].map((w, i) => (
-                <div key={i} className="h-3 bg-[#F1F5F9] rounded animate-pulse" style={{ width: `${w}%` }} />
+                <div
+                  key={i}
+                  className="h-3 bg-[#F1F5F9] rounded animate-pulse"
+                  style={{ width: `${w}%` }}
+                />
               ))}
             </div>
           ) : (
             <>
               {topic && (
                 <div>
-                  <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">토픽</p>
+                  <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">
+                    토픽
+                  </p>
                   <span className="inline-block text-xs font-medium px-2.5 py-1 rounded-full bg-[#EEF2FF] text-[#4F46E5]">
                     {topic}
                   </span>
@@ -966,18 +1138,26 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
               )}
               {author && (
                 <div>
-                  <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">저자</p>
+                  <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">
+                    저자
+                  </p>
                   <p className="text-xs text-[#475569]">{author}</p>
                 </div>
               )}
               {summary ? (
                 <div>
-                  <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">요약</p>
-                  <p className="text-xs text-[#475569] leading-relaxed">{summary}</p>
+                  <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest mb-1.5">
+                    요약
+                  </p>
+                  <p className="text-xs text-[#475569] leading-relaxed">
+                    {summary}
+                  </p>
                 </div>
               ) : (
                 !loading && (
-                  <p className="text-xs text-[#94A3B8] italic">요약 정보가 없습니다.</p>
+                  <p className="text-xs text-[#94A3B8] italic">
+                    요약 정보가 없습니다.
+                  </p>
                 )
               )}
             </>
@@ -992,8 +1172,18 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-xs font-semibold text-[#4F46E5] hover:text-[#4338CA] transition-colors"
           >
-            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            <svg
+              className="w-3.5 h-3.5 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
             </svg>
             원 논문 보기 — arXiv:{paperId}
           </a>
@@ -1004,7 +1194,14 @@ function PaperSidePanel({ paperId, topicLabel, detail, loading, isBookmarked, on
 }
 
 // 실제 ReactFlow를 렌더링하는 내부 컴포넌트 (ReactFlowProvider 내에서 사용)
-function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }) {
+function RoadmapFlow({
+  root,
+  roots,
+  searchQuery,
+  generatedAt,
+  apiError,
+  papers,
+}) {
   // paper_id → 논문 전체 데이터 맵 (노드 렌더링 시 제목 표시용)
   const paperMap = useMemo(() => {
     const map = {};
@@ -1021,56 +1218,74 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   const [paperBookmarked, setPaperBookmarked] = useState(new Set());
 
   // 논문 노드 클릭 시 상세 정보 API 호출
-  const handlePaperClick = useCallback(async (paperId, topicLabel) => {
-    setSelectedPaper({ paperId, topicLabel });
-    setPaperDetail(null);
-    setPaperLoading(true);
-    try {
-      const detail = await paperApi.getPaperDetail(paperId);
-      setPaperDetail(detail);
-    } catch {
-      // API 실패 시 paperMap의 로컬 데이터로 폴백
-      const local = paperMap[paperId];
-      setPaperDetail(local ? {
-        paperId,
-        title: local.title,
-        abstracts: local.abstract,
-        author: Array.isArray(local.authors) ? local.authors.join(", ") : (local.submitter ?? null),
-        categories: Array.isArray(local.categories) ? local.categories.join(", ") : local.categories,
-        privaryCategory: local.primary_category ?? (Array.isArray(local.categories) ? local.categories[0] : null),
-      } : { paperId });
-    } finally {
-      setPaperLoading(false);
-    }
-  }, [paperMap]);
+  const handlePaperClick = useCallback(
+    async (paperId, topicLabel) => {
+      setSelectedPaper({ paperId, topicLabel });
+      setPaperDetail(null);
+      setPaperLoading(true);
+      try {
+        const detail = await paperApi.getPaperDetail(paperId);
+        setPaperDetail(detail);
+      } catch {
+        // API 실패 시 paperMap의 로컬 데이터로 폴백
+        const local = paperMap[paperId];
+        setPaperDetail(
+          local
+            ? {
+                paperId,
+                title: local.title,
+                abstracts: local.abstract,
+                author: Array.isArray(local.authors)
+                  ? local.authors.join(", ")
+                  : (local.submitter ?? null),
+                categories: Array.isArray(local.categories)
+                  ? local.categories.join(", ")
+                  : local.categories,
+                privaryCategory:
+                  local.primary_category ??
+                  (Array.isArray(local.categories)
+                    ? local.categories[0]
+                    : null),
+              }
+            : { paperId },
+        );
+      } finally {
+        setPaperLoading(false);
+      }
+    },
+    [paperMap],
+  );
 
   // 논문 북마크 토글 — 낙관적 UI 업데이트 후 API 실패 시 롤백
-  const togglePaperBookmark = useCallback(async (paperId, title, category) => {
-    const isBookmarked = paperBookmarked.has(paperId);
-    setPaperBookmarked((prev) => {
-      const next = new Set(prev);
-      isBookmarked ? next.delete(paperId) : next.add(paperId);
-      return next;
-    });
-    try {
-      if (isBookmarked) {
-        await bookmarksApi.removePaperBookmark(paperId);
-      } else {
-        await bookmarksApi.addPaperBookmark({
-          paperId,
-          title: title ?? paperId,
-          category: category ?? "",
-        });
-      }
-    } catch {
-      // 실패 시 이전 상태로 롤백
+  const togglePaperBookmark = useCallback(
+    async (paperId, title, category) => {
+      const isBookmarked = paperBookmarked.has(paperId);
       setPaperBookmarked((prev) => {
         const next = new Set(prev);
-        isBookmarked ? next.add(paperId) : next.delete(paperId);
+        isBookmarked ? next.delete(paperId) : next.add(paperId);
         return next;
       });
-    }
-  }, [paperBookmarked]);
+      try {
+        if (isBookmarked) {
+          await bookmarksApi.removePaperBookmark(paperId);
+        } else {
+          await bookmarksApi.addPaperBookmark({
+            paperId,
+            title: title ?? paperId,
+            category: category ?? "",
+          });
+        }
+      } catch {
+        // 실패 시 이전 상태로 롤백
+        setPaperBookmarked((prev) => {
+          const next = new Set(prev);
+          isBookmarked ? next.add(paperId) : next.delete(paperId);
+          return next;
+        });
+      }
+    },
+    [paperBookmarked],
+  );
 
   const { nodes, edges, onNodesChange, onEdgesChange, onNodeClick } =
     useRoadmapFlow(root, handlePaperClick, paperMap);
@@ -1087,7 +1302,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           color: CHART_COLORS[i % CHART_COLORS.length],
         }))
         .filter((d) => d.count > 0),
-    [root]
+    [root],
   );
   const distTotal = distribution.reduce((s, d) => s + d.count, 0);
   const distMax = Math.max(...distribution.map((d) => d.count), 1);
@@ -1107,10 +1322,13 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
+
   const [bookmarked, setBookmarked] = useState(new Set());
-  const [bookmarkIdMap, setBookmarkIdMap] = useState({}); // 로컬 인덱스 → 서버 북마크 ID
+  const [bookmarkIdMap, setBookmarkIdMap] = useState({});
   const [showPaperModal, setShowPaperModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [detailItem, setDetailItem] = useState(null);
@@ -1125,7 +1343,8 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
 
   // 작업이 끝날 때까지 단계별 진행 상황을 2초마다 조회한다
   const pollGapJob = useCallback(async (jobId, token) => {
-    const isCurrent = () => mountedRef.current && pollTokenRef.current === token;
+    const isCurrent = () =>
+      mountedRef.current && pollTokenRef.current === token;
     let job;
     let failures = 0;
     try {
@@ -1149,9 +1368,13 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
       if (job.status === "completed") {
         setGapItems(parseGapContent(job.gap_content));
       } else if (job.status === "no_candidates") {
-        setGapError("검증을 통과한 연구 공백 후보가 없습니다. 다른 논문 조합으로 다시 탐색해보세요.");
+        setGapError(
+          "검증을 통과한 연구 공백 후보가 없습니다. 다른 논문 조합으로 다시 탐색해보세요.",
+        );
       } else if (job.status === "timeout") {
-        setGapError("분석 시간이 초과되었습니다. 논문 수를 줄여 다시 시도해주세요.");
+        setGapError(
+          "분석 시간이 초과되었습니다. 논문 수를 줄여 다시 시도해주세요.",
+        );
       } else {
         setGapError("GAP 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
       }
@@ -1166,34 +1389,41 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   }, []);
 
   // 선택한 논문 ID로 GAP 분석 작업을 시작하고 진행 상황을 따라간다
-  const runGapAnalysis = useCallback(async (ids) => {
-    const paperIds = [...ids];
-    const token = ++pollTokenRef.current;
-    setShowPaperModal(false);
-    setGapLoading(true);
-    setGapError("");
-    setGapItems([]);
-    setGapJob(null);
-    setLeftTab("progress");
-    let jobId;
-    try {
-      const selectedPapers = papers.filter((p) => ids.has(p.paper_id ?? p.arxiv_id ?? ""));
-      // 선택 논문을 서버에 먼저 전달 (실패해도 갭 분석은 계속 진행)
-      if (selectedPapers.length > 0) {
-        await paperApi.selectPapers(selectedPapers).catch(() => {});
+  const runGapAnalysis = useCallback(
+    async (ids) => {
+      const paperIds = [...ids];
+      const token = ++pollTokenRef.current;
+      setShowPaperModal(false);
+      setGapLoading(true);
+      setGapError("");
+      setGapItems([]);
+      setGapJob(null);
+      setLeftTab("progress");
+      let jobId;
+      try {
+        const selectedPapers = papers.filter((p) =>
+          ids.has(p.paper_id ?? p.arxiv_id ?? ""),
+        );
+        // 선택 논문을 서버에 먼저 전달 (실패해도 갭 분석은 계속 진행)
+        if (selectedPapers.length > 0) {
+          await paperApi.selectPapers(selectedPapers).catch(() => {});
+        }
+        ({ jobId } = await gapApi.startAnalysisJob({ paperIds }));
+      } catch {
+        if (pollTokenRef.current === token) {
+          setGapError(
+            "GAP 분석을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.",
+          );
+          setGapLoading(false);
+        }
+        return;
       }
-      ({ jobId } = await gapApi.startAnalysisJob({ paperIds }));
-    } catch {
-      if (pollTokenRef.current === token) {
-        setGapError("GAP 분석을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.");
-        setGapLoading(false);
-      }
-      return;
-    }
-    // 분석이 길어 새로고침·페이지 이동 후에도 이어서 볼 수 있도록 작업 ID를 저장
-    saveGapJob(jobId, searchQuery);
-    await pollGapJob(jobId, token);
-  }, [papers, searchQuery, pollGapJob]);
+      // 분석이 길어 새로고침·페이지 이동 후에도 이어서 볼 수 있도록 작업 ID를 저장
+      saveGapJob(jobId, searchQuery);
+      await pollGapJob(jobId, token);
+    },
+    [papers, searchQuery, pollGapJob],
+  );
 
   // 같은 검색어로 돌아왔을 때 진행 중이던 분석이 있으면 이어서 폴링
   useEffect(() => {
@@ -1211,29 +1441,44 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   }, [selectedIds, runGapAnalysis]);
 
   // GAP 아이디어 북마크 토글 — 낙관적 업데이트 후 서버 ID 저장
-  const toggleBookmark = useCallback(async (i) => {
-    const item = gapItems[i];
-    if (!item) return;
-    if (bookmarked.has(i)) {
-      const backendId = bookmarkIdMap[i];
-      setBookmarked((prev) => { const n = new Set(prev); n.delete(i); return n; });
-      if (backendId) {
-        bookmarksApi.removeGapBookmark(backendId).catch(() => {});
-        setBookmarkIdMap((prev) => { const n = { ...prev }; delete n[i]; return n; });
-      }
-    } else {
-      setBookmarked((prev) => { const n = new Set(prev); n.add(i); return n; });
-      try {
-        const res = await bookmarksApi.addGapBookmark({
-          title: item.title ?? item.name ?? "Gap 아이디어",
-          content: JSON.stringify(item),
-          keyword: searchQuery ?? "",
+  const toggleBookmark = useCallback(
+    async (i) => {
+      const item = gapItems[i];
+      if (!item) return;
+      if (bookmarked.has(i)) {
+        const backendId = bookmarkIdMap[i];
+        setBookmarked((prev) => {
+          const n = new Set(prev);
+          n.delete(i);
+          return n;
         });
-        // 서버에서 받은 ID를 저장해두어야 나중에 삭제 시 사용 가능
-        if (res?.id) setBookmarkIdMap((prev) => ({ ...prev, [i]: res.id }));
-      } catch {}
-    }
-  }, [bookmarked, bookmarkIdMap, gapItems, searchQuery]);
+        if (backendId) {
+          bookmarksApi.removeGapBookmark(backendId).catch(() => {});
+          setBookmarkIdMap((prev) => {
+            const n = { ...prev };
+            delete n[i];
+            return n;
+          });
+        }
+      } else {
+        setBookmarked((prev) => {
+          const n = new Set(prev);
+          n.add(i);
+          return n;
+        });
+        try {
+          const res = await bookmarksApi.addGapBookmark({
+            title: item.title ?? item.name ?? "Gap 아이디어",
+            content: JSON.stringify(item),
+            keyword: searchQuery ?? "",
+          });
+          // 서버에서 받은 ID를 저장해두어야 나중에 삭제 시 사용 가능
+          if (res?.id) setBookmarkIdMap((prev) => ({ ...prev, [i]: res.id }));
+        } catch {}
+      }
+    },
+    [bookmarked, bookmarkIdMap, gapItems, searchQuery],
+  );
 
   return (
     <div className="mx-auto max-w-screen-3xl px-8 py-8 flex flex-col gap-6">
@@ -1243,8 +1488,10 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
         <p className="mt-1 text-sm text-[#466084]">
           {searchQuery ? (
             <>
-              <span className="font-semibold text-[#1D4ED8]">"{searchQuery}"</span>
-              {" "}검색 결과 로드맵입니다.
+              <span className="font-semibold text-[#1D4ED8]">
+                "{searchQuery}"
+              </span>{" "}
+              검색 결과 로드맵입니다.
             </>
           ) : (
             "연구 주제의 계층적 구조를 탐색하고 관련 논문을 확인하세요"
@@ -1276,8 +1523,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           </span>
         </div>
         <span className="text-xs text-[#94A3B8] ml-auto">
-          생성일:{" "}
-          {new Date(generatedAt).toLocaleDateString("ko-KR")}
+          생성일: {new Date(generatedAt).toLocaleDateString("ko-KR")}
         </span>
       </div>
 
@@ -1340,7 +1586,10 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
       <div className="flex gap-6">
         {/* 왼쪽: 분석 과정(단계별 검증 결과) / 토픽별 점유율 — 분석을 시작하면 탭이 생긴다 */}
         {/* min-w-0: 긴 논문 제목(말줄임)이 패널 폭을 44%보다 넓히지 않도록 */}
-        <div className="min-w-0 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6" style={{ flex: "0 0 44%" }}>
+        <div
+          className="min-w-0 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6"
+          style={{ flex: "0 0 44%" }}
+        >
           {gapJob || gapLoading ? (
             <div className="flex items-center gap-1 mb-5 bg-[#F1F5F9] rounded-lg p-1 w-fit">
               {[
@@ -1351,7 +1600,9 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
                   key={tab.key}
                   onClick={() => setLeftTab(tab.key)}
                   className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${
-                    leftTab === tab.key ? "bg-white text-[#1E293B] shadow-sm" : "text-[#64748B] hover:text-[#1E293B]"
+                    leftTab === tab.key
+                      ? "bg-white text-[#1E293B] shadow-sm"
+                      : "text-[#64748B] hover:text-[#1E293B]"
                   }`}
                 >
                   {tab.label}
@@ -1359,52 +1610,67 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
               ))}
             </div>
           ) : (
-            <h3 className="text-sm font-semibold text-[#1E293B] mb-5">해당 계층까지의 점유율</h3>
+            <h3 className="text-sm font-semibold text-[#1E293B] mb-5">
+              해당 계층까지의 점유율
+            </h3>
           )}
           {(gapJob || gapLoading) && leftTab === "progress" ? (
             gapJob ? (
-              <div className="overflow-y-auto paper-scroll pr-1" style={{ maxHeight: "560px" }}>
+              <div
+                className="overflow-y-auto paper-scroll pr-1"
+                style={{ maxHeight: "560px" }}
+              >
                 <AnalysisProgressPanel job={gapJob} />
               </div>
             ) : (
               <div className="flex items-center gap-2 py-6">
                 <div className="w-4 h-4 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
-                <p className="text-xs text-[#94A3B8]">분석 작업을 시작하는 중입니다...</p>
+                <p className="text-xs text-[#94A3B8]">
+                  분석 작업을 시작하는 중입니다...
+                </p>
               </div>
             )
           ) : (
-          <>
-          <div className="flex items-end justify-center gap-5 h-36 mb-4">
-            {distribution.map((d) => (
-              <div key={d.label} className="flex flex-col items-center gap-1">
-                <span className="text-xs font-semibold text-[#334155]">{d.count}</span>
-                <div
-                  style={{
-                    // 최댓값 기준 상대 높이 계산, 최소 8px 보장
-                    height: `${Math.max((d.count / distMax) * 112, 8)}px`,
-                    backgroundColor: d.color,
-                    width: "48px",
-                    borderRadius: "4px 4px 0 0",
-                  }}
-                />
+            <>
+              <div className="flex items-end justify-center gap-5 h-36 mb-4">
+                {distribution.map((d) => (
+                  <div
+                    key={d.label}
+                    className="flex flex-col items-center gap-1"
+                  >
+                    <span className="text-xs font-semibold text-[#334155]">
+                      {d.count}
+                    </span>
+                    <div
+                      style={{
+                        // 최댓값 기준 상대 높이 계산, 최소 8px 보장
+                        height: `${Math.max((d.count / distMax) * 112, 8)}px`,
+                        backgroundColor: d.color,
+                        width: "48px",
+                        borderRadius: "4px 4px 0 0",
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="border-t border-[#F1F5F9] pt-3">
-            <p className="text-xs text-[#64748B]">
-              총 집계된 논문 수:{" "}
-              <span className="font-bold text-[#3B82F6]">{distTotal}</span>
-            </p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
-              {distribution.map((d) => (
-                <div key={d.label} className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                  <span className="text-xs text-[#64748B]">{d.label}</span>
+              <div className="border-t border-[#F1F5F9] pt-3">
+                <p className="text-xs text-[#64748B]">
+                  총 집계된 논문 수:{" "}
+                  <span className="font-bold text-[#3B82F6]">{distTotal}</span>
+                </p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                  {distribution.map((d) => (
+                    <div key={d.label} className="flex items-center gap-1.5">
+                      <div
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: d.color }}
+                      />
+                      <span className="text-xs text-[#64748B]">{d.label}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-          </>
+              </div>
+            </>
           )}
         </div>
 
@@ -1412,7 +1678,9 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
         <div className="flex-1 min-w-0 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <h3 className="text-sm font-semibold text-[#1E293B]">CLIP의 추천 아이디어</h3>
+              <h3 className="text-sm font-semibold text-[#1E293B]">
+                CLIP의 추천 아이디어
+              </h3>
               {/* 검증 결과(CoT4·CoT5)가 있으면 목록/비교표 전환 */}
               {!gapLoading && hasEvaluation(gapItems) && (
                 <div className="flex items-center gap-1 bg-[#F1F5F9] rounded-lg p-0.5">
@@ -1424,7 +1692,9 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
                       key={view.key}
                       onClick={() => setResultView(view.key)}
                       className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors ${
-                        resultView === view.key ? "bg-white text-[#1E293B] shadow-sm" : "text-[#64748B] hover:text-[#1E293B]"
+                        resultView === view.key
+                          ? "bg-white text-[#1E293B] shadow-sm"
+                          : "text-[#64748B] hover:text-[#1E293B]"
                       }`}
                     >
                       {view.label}
@@ -1463,8 +1733,12 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           {gapLoading && (
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
               <div className="w-6 h-6 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs text-[#94A3B8]">퓨쳐워크 아이디어를 분석하는 중입니다...</p>
-              <p className="text-[11px] text-[#94A3B8]">단계별 검증 결과는 왼쪽 '분석 과정'에서 바로 확인할 수 있어요</p>
+              <p className="text-xs text-[#94A3B8]">
+                퓨쳐워크 아이디어를 분석하는 중입니다...
+              </p>
+              <p className="text-[11px] text-[#94A3B8]">
+                단계별 검증 결과는 왼쪽 '분석 과정'에서 바로 확인할 수 있어요
+              </p>
             </div>
           )}
 
@@ -1482,44 +1756,72 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           )}
 
           {/* 분석 결과 목록 */}
-          {!gapLoading && gapItems.length > 0 && resultView === "table" && hasEvaluation(gapItems) && (
-            <div className="overflow-y-auto paper-scroll" style={{ maxHeight: "560px" }}>
-              <ProposalComparisonTable
-                items={gapItems}
-                onSelect={(i) => setDetailItem({ item: gapItems[i], index: i })}
-              />
-            </div>
-          )}
-          {!gapLoading && gapItems.length > 0 && (resultView === "list" || !hasEvaluation(gapItems)) && (
-            <div className="flex flex-col gap-2.5 overflow-y-auto paper-scroll" style={{ maxHeight: "560px" }}>
-              {gapItems.map((item, i) => (
-                <div
-                  key={i}
-                  onClick={() => setDetailItem({ item, index: i })}
-                  className="rounded-xl border border-[#E2E8F0] px-4 py-3 cursor-pointer hover:border-[#C7D2FE] hover:bg-[#FAFAFF] transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#1E293B] truncate">
-                        {i + 1}. {item.title ?? item.name ?? "추천 아이디어"}
-                      </p>
-                      <p className="text-xs text-[#64748B] mt-1 line-clamp-1">
-                        {item.backgroundAndGap ?? item.description ?? item.content ?? ""}
-                      </p>
+          {!gapLoading &&
+            gapItems.length > 0 &&
+            resultView === "table" &&
+            hasEvaluation(gapItems) && (
+              <div
+                className="overflow-y-auto paper-scroll"
+                style={{ maxHeight: "560px" }}
+              >
+                <ProposalComparisonTable
+                  items={gapItems}
+                  onSelect={(i) =>
+                    setDetailItem({ item: gapItems[i], index: i })
+                  }
+                />
+              </div>
+            )}
+          {!gapLoading &&
+            gapItems.length > 0 &&
+            (resultView === "list" || !hasEvaluation(gapItems)) && (
+              <div
+                className="flex flex-col gap-2.5 overflow-y-auto paper-scroll"
+                style={{ maxHeight: "560px" }}
+              >
+                {gapItems.map((item, i) => {
+                  const title = `${i + 1}. ${item.title ?? item.name ?? "추천 아이디어"}`;
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => setDetailItem({ item, index: i })}
+                      className="rounded-xl border border-[#E2E8F0] px-4 py-3 cursor-pointer hover:border-[#C7D2FE] hover:bg-[#FAFAFF] transition-colors"
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <p
+                          className="text-sm font-semibold text-[#1E293B] leading-snug"
+                          style={{
+                            flex: "1 1 0",
+                            minWidth: 0,
+                            overflow: "hidden",
+                            whiteSpace: "nowrap",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {title}
+                        </p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleBookmark(i);
+                          }}
+                          className="p-0.5 flex-shrink-0"
+                        >
+                          <BookmarkIcon filled={bookmarked.has(i)} />
+                        </button>
+                      </div>
                       <EvaluationBadges item={item} />
                     </div>
-                    {/* 클릭이 행 클릭과 겹치지 않도록 stopPropagation */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); toggleBookmark(i); }}
-                      className="flex-shrink-0 p-0.5 mt-0.5"
-                    >
-                      <BookmarkIcon filled={bookmarked.has(i)} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
         </div>
       </div>
 
@@ -1553,7 +1855,13 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
           detail={paperDetail}
           loading={paperLoading}
           isBookmarked={paperBookmarked.has(selectedPaper.paperId)}
-          onBookmark={() => togglePaperBookmark(selectedPaper.paperId, paperDetail?.title, paperDetail?.primaryCategory)}
+          onBookmark={() =>
+            togglePaperBookmark(
+              selectedPaper.paperId,
+              paperDetail?.title,
+              paperDetail?.primaryCategory,
+            )
+          }
           onClose={() => setSelectedPaper(null)}
         />
       )}
@@ -1607,11 +1915,17 @@ export function RoadmapPreview({ onInit, onKeywordLoad }) {
           const histData = await historyApi.getHistory();
           const list = Array.isArray(histData)
             ? histData
-            : histData?.data ?? histData?.content ?? histData?.histories ?? [];
+            : (histData?.data ??
+              histData?.content ??
+              histData?.histories ??
+              []);
           const first = list[0];
-          lastKeyword = first?.keyword ?? first?.query ?? first?.searchWord ?? null;
+          lastKeyword =
+            first?.keyword ?? first?.query ?? first?.searchWord ?? null;
         } catch {
-          const local = JSON.parse(localStorage.getItem("clip_recent_searches") ?? "[]");
+          const local = JSON.parse(
+            localStorage.getItem("clip_recent_searches") ?? "[]",
+          );
           lastKeyword = local[0]?.query ?? null;
         }
 
@@ -1640,17 +1954,34 @@ export function RoadmapPreview({ onInit, onKeywordLoad }) {
     loadLastRoadmap();
   }, [retryCount]);
 
-  const roots = useMemo(() => parseData(roadmapData ?? SAMPLE_DATA), [roadmapData]);
+  const roots = useMemo(
+    () => parseData(roadmapData ?? SAMPLE_DATA),
+    [roadmapData],
+  );
   const root = roots[0] ?? null;
 
   if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <svg className="w-8 h-8 text-[#CBD5E1] animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          <svg
+            className="w-8 h-8 text-[#CBD5E1] animate-spin"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
           </svg>
           <p className="text-xs text-[#94A3B8]">로드맵 불러오는 중...</p>
         </div>
@@ -1663,25 +1994,46 @@ export function RoadmapPreview({ onInit, onKeywordLoad }) {
       <div className="w-full h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center px-8">
           <div className="w-14 h-14 rounded-full bg-[#FEF2F2] flex items-center justify-center">
-            <svg className="w-7 h-7 text-[#EF4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            <svg
+              className="w-7 h-7 text-[#EF4444]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+              />
             </svg>
           </div>
           <div className="flex flex-col gap-1">
-            <p className="text-sm font-semibold text-[#1E293B]">로드맵을 불러올 수 없어요</p>
+            <p className="text-sm font-semibold text-[#1E293B]">
+              로드맵을 불러올 수 없어요
+            </p>
             <p className="text-xs text-[#94A3B8] leading-relaxed">
-              최근 로드맵을 가져오는 데 실패했습니다.<br />
+              최근 로드맵을 가져오는 데 실패했습니다.
+              <br />
               잠시 후 다시 시도해 주세요.
             </p>
           </div>
           <button
-            onClick={() => setRetryCount(c => c + 1)}
+            onClick={() => setRetryCount((c) => c + 1)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#0060AD] text-white text-xs font-medium hover:bg-[#004f8f] transition-colors"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
             다시 시도
           </button>
@@ -1723,7 +2075,7 @@ function Roadmap() {
       id: roots[0].id,
       label: roots[0].label,
       topics: roots.flatMap((r) =>
-        r.topics.map((t) => ({ ...t, label: r.id }))
+        r.topics.map((t) => ({ ...t, label: r.id })),
       ),
     };
   }, [roots]);
@@ -1736,9 +2088,9 @@ function Roadmap() {
     // 로드맵 노드에서 paper_id만 추출 (중복 제거)
     const seen = new Set();
     const list = [];
-    for (const r of (roadmapData?.roots ?? [])) {
-      for (const node of (r.intermediate_nodes ?? [])) {
-        for (const child of (node.children ?? [])) {
+    for (const r of roadmapData?.roots ?? []) {
+      for (const node of r.intermediate_nodes ?? []) {
+        for (const child of node.children ?? []) {
           const id = child.paper_id;
           if (id && !seen.has(id)) {
             seen.add(id);
