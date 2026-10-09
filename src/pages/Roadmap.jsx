@@ -3,6 +3,8 @@ import { useLocation } from "react-router-dom";
 import { roadmapApi, gapApi, paperApi, bookmarksApi, historyApi } from "@/api";
 import AnalysisProgressPanel from "@/components/AnalysisProgressPanel";
 import { EvaluationBadges, ProposalComparisonTable, hasEvaluation } from "@/components/ProposalEvaluation";
+import { FeasibilityEvidence, NoveltyEvidence } from "@/components/ProposalEvidence";
+import { VerdictBadge } from "@/components/verdict";
 import {
   ReactFlow,
   Background,
@@ -823,11 +825,19 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
         { label: "기대 기여", text: item.expectedContribution },
       ]
     : null;
+  // CoT4·CoT5 결과가 있으면 근거 탭을 보여준다
+  const hasEvidence = Boolean(item.feasibility || item.novelty || item.noveltyMissingReason);
+  const [tab, setTab] = useState("content");
+  const tabs = [
+    { key: "content", label: "제안 내용" },
+    { key: "feasibility", label: "실현가능성 근거", verdict: item.feasibility?.classification },
+    { key: "novelty", label: "신규성 근거", verdict: item.novelty?.classification },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-[580px] max-w-[92vw] p-6 max-h-[80vh] overflow-y-auto"
+      <div className={`relative bg-white rounded-2xl shadow-2xl ${hasEvidence ? "w-[720px]" : "w-[580px]"} max-w-[92vw] p-6 max-h-[80vh] overflow-y-auto`}
         style={{ animation: "scaleIn 0.18s ease-out" }}>
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex-1 min-w-0">
@@ -856,7 +866,27 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
             </button>
           </div>
         </div>
-        {sections ? (
+        {hasEvidence && (
+          <div className="flex items-center gap-1 mb-4 border-b border-[#F1F5F9]">
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 -mb-px border-b-2 transition-colors ${
+                  tab === t.key ? "border-[#6366F1] text-[#1E293B]" : "border-transparent text-[#94A3B8] hover:text-[#475569]"
+                }`}
+              >
+                {t.label}
+                {t.verdict && <VerdictBadge value={t.verdict} />}
+              </button>
+            ))}
+          </div>
+        )}
+        {hasEvidence && tab === "feasibility" ? (
+          <FeasibilityEvidence feasibility={item.feasibility} />
+        ) : hasEvidence && tab === "novelty" ? (
+          <NoveltyEvidence novelty={item.novelty} missingReason={item.noveltyMissingReason} />
+        ) : sections ? (
           <div className="flex flex-col gap-3">
             {sections.filter(s => s.text).map((s) => (
               <div key={s.label}>

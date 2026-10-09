@@ -16,6 +16,9 @@ export const VERDICT_STYLE = {
   UNCERTAIN: { label: "불확실", icon: "?", color: STATUS_COLOR.warning },
   NOT_NOVEL: { label: "기존 연구 있음", icon: "✕", color: STATUS_COLOR.critical },
   ERROR: { label: "오류", icon: "!", color: STATUS_COLOR.serious },
+  // CoT5 논문별 동등성 검사 (제안 vs 검색된 논문 한 편)
+  DIFFERENT: { label: "다름", icon: "✓", color: STATUS_COLOR.good },
+  EQUIVALENT: { label: "동등", icon: "✕", color: STATUS_COLOR.critical },
 };
 
 export const CONCERN_LABELS = {
