@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { roadmapApi, gapApi, paperApi, bookmarksApi, historyApi } from "@/api";
+import AnalysisProgressPanel from "@/components/AnalysisProgressPanel";
 import {
   ReactFlow,
   Background,
@@ -651,6 +652,31 @@ const CHART_COLORS = [
 ];
 
 // GAP 분석 결과 JSON 파싱 — 마크다운 코드블록이 포함되어 있을 수 있어 제거 후 파싱
+// 진행 중인 갭 분석 작업 ID — 새로고침·페이지 이동 후 같은 검색어로 돌아오면 이어서 폴링한다.
+// sessionStorage가 막힌 환경(사생활 보호 모드 등)에서는 조용히 무시한다.
+const GAP_JOB_KEY = "clip.gapJob";
+
+function saveGapJob(jobId, query) {
+  try {
+    sessionStorage.setItem(GAP_JOB_KEY, JSON.stringify({ jobId, query: query ?? "" }));
+  } catch {}
+}
+
+function loadSavedGapJob() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(GAP_JOB_KEY) ?? "null");
+    return saved?.jobId ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSavedGapJob() {
+  try {
+    sessionStorage.removeItem(GAP_JOB_KEY);
+  } catch {}
+}
+
 function parseGapContent(content) {
   if (!content) return [];
   const tryParse = (val) => {
@@ -1018,6 +1044,17 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
   const [gapItems, setGapItems] = useState([]);
   const [gapLoading, setGapLoading] = useState(false);
   const [gapError, setGapError] = useState("");
+  // 단계별 진행 상황 (AI 서버 작업 상태) — 하단 왼쪽 "분석 과정" 패널에 표시
+  const [gapJob, setGapJob] = useState(null);
+  const [leftTab, setLeftTab] = useState("share");
+  // 폴링 루프를 식별하는 토큰 — 새 분석을 시작하면 이전 루프가 멈춘다
+  const pollTokenRef = useRef(0);
+  // 페이지를 떠나면 폴링을 멈춘다. (StrictMode·HMR의 정리→재실행에서는 다시 true가 되므로 끊기지 않는다)
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   const [bookmarked, setBookmarked] = useState(new Set());
   const [bookmarkIdMap, setBookmarkIdMap] = useState({}); // 로컬 인덱스 → 서버 북마크 ID
   const [showPaperModal, setShowPaperModal] = useState(false);
@@ -1032,27 +1069,87 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
     });
   }, []);
 
-  // 선택한 논문 ID로 GAP 분석 API 호출
+  // 작업이 끝날 때까지 단계별 진행 상황을 2초마다 조회한다
+  const pollGapJob = useCallback(async (jobId, token) => {
+    const isCurrent = () => mountedRef.current && pollTokenRef.current === token;
+    let job;
+    let failures = 0;
+    try {
+      while (isCurrent()) {
+        try {
+          job = await gapApi.getAnalysisJob(jobId);
+          failures = 0;
+        } catch (error) {
+          // 서버 재시작 등으로 작업이 사라졌으면(404) 바로 멈추고, 일시적인 실패는 몇 번 더 시도한다
+          if (error?.response?.status === 404 || ++failures >= 5) throw error;
+        }
+        if (!isCurrent()) return;
+        if (job) setGapJob(job);
+        if (job && !["queued", "running"].includes(job.status)) break;
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      // 페이지를 떠나 멈춘 경우에는 저장된 작업을 남겨 두어 돌아왔을 때 이어서 본다
+      if (!isCurrent() || !job) return;
+      clearSavedGapJob();
+
+      if (job.status === "completed") {
+        setGapItems(parseGapContent(job.gap_content));
+      } else if (job.status === "no_candidates") {
+        setGapError("검증을 통과한 연구 공백 후보가 없습니다. 다른 논문 조합으로 다시 탐색해보세요.");
+      } else if (job.status === "timeout") {
+        setGapError("분석 시간이 초과되었습니다. 논문 수를 줄여 다시 시도해주세요.");
+      } else {
+        setGapError("GAP 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      }
+    } catch {
+      if (isCurrent()) {
+        clearSavedGapJob();
+        setGapError("GAP 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      }
+    } finally {
+      if (isCurrent()) setGapLoading(false);
+    }
+  }, []);
+
+  // 선택한 논문 ID로 GAP 분석 작업을 시작하고 진행 상황을 따라간다
   const runGapAnalysis = useCallback(async (ids) => {
     const paperIds = [...ids];
+    const token = ++pollTokenRef.current;
     setShowPaperModal(false);
     setGapLoading(true);
     setGapError("");
     setGapItems([]);
+    setGapJob(null);
+    setLeftTab("progress");
+    let jobId;
     try {
       const selectedPapers = papers.filter((p) => ids.has(p.paper_id ?? p.arxiv_id ?? ""));
       // 선택 논문을 서버에 먼저 전달 (실패해도 갭 분석은 계속 진행)
       if (selectedPapers.length > 0) {
         await paperApi.selectPapers(selectedPapers).catch(() => {});
       }
-      const result = await gapApi.refreshRecommendations({ paperIds });
-      setGapItems(parseGapContent(result?.gapContent ?? result));
+      ({ jobId } = await gapApi.startAnalysisJob({ paperIds }));
     } catch {
-      setGapError("GAP 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setGapLoading(false);
+      if (pollTokenRef.current === token) {
+        setGapError("GAP 분석을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.");
+        setGapLoading(false);
+      }
+      return;
     }
-  }, [papers]);
+    // 분석이 길어 새로고침·페이지 이동 후에도 이어서 볼 수 있도록 작업 ID를 저장
+    saveGapJob(jobId, searchQuery);
+    await pollGapJob(jobId, token);
+  }, [papers, searchQuery, pollGapJob]);
+
+  // 같은 검색어로 돌아왔을 때 진행 중이던 분석이 있으면 이어서 폴링
+  useEffect(() => {
+    const saved = loadSavedGapJob();
+    if (!saved || saved.query !== (searchQuery ?? "")) return;
+    const token = ++pollTokenRef.current;
+    setGapLoading(true);
+    setLeftTab("progress");
+    pollGapJob(saved.jobId, token);
+  }, [searchQuery, pollGapJob]);
 
   const handleConfirm = useCallback(() => {
     if (!selectedIds.size) return;
@@ -1187,9 +1284,42 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
 
       {/* 하단: 점유율 바 차트 + GAP 추천 */}
       <div className="flex gap-6">
-        {/* 토픽별 논문 수 바 차트 */}
-        <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6" style={{ flex: "0 0 44%" }}>
-          <h3 className="text-sm font-semibold text-[#1E293B] mb-5">해당 계층까지의 점유율</h3>
+        {/* 왼쪽: 분석 과정(단계별 검증 결과) / 토픽별 점유율 — 분석을 시작하면 탭이 생긴다 */}
+        {/* min-w-0: 긴 논문 제목(말줄임)이 패널 폭을 44%보다 넓히지 않도록 */}
+        <div className="min-w-0 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6" style={{ flex: "0 0 44%" }}>
+          {gapJob || gapLoading ? (
+            <div className="flex items-center gap-1 mb-5 bg-[#F1F5F9] rounded-lg p-1 w-fit">
+              {[
+                { key: "progress", label: "분석 과정" },
+                { key: "share", label: "해당 계층까지의 점유율" },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setLeftTab(tab.key)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${
+                    leftTab === tab.key ? "bg-white text-[#1E293B] shadow-sm" : "text-[#64748B] hover:text-[#1E293B]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <h3 className="text-sm font-semibold text-[#1E293B] mb-5">해당 계층까지의 점유율</h3>
+          )}
+          {(gapJob || gapLoading) && leftTab === "progress" ? (
+            gapJob ? (
+              <div className="overflow-y-auto paper-scroll pr-1" style={{ maxHeight: "560px" }}>
+                <AnalysisProgressPanel job={gapJob} />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 py-6">
+                <div className="w-4 h-4 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
+                <p className="text-xs text-[#94A3B8]">분석 작업을 시작하는 중입니다...</p>
+              </div>
+            )
+          ) : (
+          <>
           <div className="flex items-end justify-center gap-5 h-36 mb-4">
             {distribution.map((d) => (
               <div key={d.label} className="flex flex-col items-center gap-1">
@@ -1220,6 +1350,8 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
               ))}
             </div>
           </div>
+          </>
+          )}
         </div>
 
         {/* CLIP 갭 아이디어 추천 패널 */}
@@ -1257,6 +1389,7 @@ function RoadmapFlow({ root, roots, searchQuery, generatedAt, apiError, papers }
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
               <div className="w-6 h-6 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
               <p className="text-xs text-[#94A3B8]">퓨쳐워크 아이디어를 분석하는 중입니다...</p>
+              <p className="text-[11px] text-[#94A3B8]">단계별 검증 결과는 왼쪽 '분석 과정'에서 바로 확인할 수 있어요</p>
             </div>
           )}
 
