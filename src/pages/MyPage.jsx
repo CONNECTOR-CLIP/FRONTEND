@@ -148,8 +148,8 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
   // 입력 중 실시간 유효성 검사
   const handleNicknameChange = (val) => {
     setNewNickname(val);
-    if (val.length > 10) {
-      setNicknameError("닉네임은 10자 이하로 입력해주세요.");
+    if (val.length > 20) {
+      setNicknameError("닉네임은 20자 이하로 입력해주세요.");
     } else if (val.trim() === user?.nickname) {
       setNicknameError("현재 닉네임과 동일합니다.");
     } else {
@@ -159,7 +159,7 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
 
   const handleNicknameSave = async () => {
     if (!newNickname.trim()) return showToast("닉네임을 입력해주세요.", "error");
-    if (newNickname.trim().length > 10) return showToast("닉네임은 10자 이하로 입력해주세요.", "error");
+    if (newNickname.trim().length > 20) return showToast("닉네임은 20자 이하로 입력해주세요.", "error");
     if (newNickname.trim() === user?.nickname) return showToast("현재 닉네임과 동일합니다.", "error");
     setLoading(true);
     try {
@@ -170,8 +170,9 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
       setNewNickname("");
       setNicknameError("");
       showToast("닉네임이 변경되었습니다.");
-    } catch {
-      showToast("닉네임 변경에 실패했습니다.", "error");
+    } catch (err) {
+      const msg = err?.response?.data?.message ?? err?.response?.data?.error ?? "닉네임 변경에 실패했습니다.";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -183,12 +184,13 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
     if (newPw.length < 8) return showToast("비밀번호는 8자 이상이어야 합니다.", "error");
     setLoading(true);
     try {
-      await usersApi.changePassword({ password: newPw });
+      await usersApi.changePassword({ currentPassword: currentPw, newPassword: newPw });
       setPwEdit(false);
       setCurrentPw(""); setNewPw(""); setConfirmPw("");
       showToast("비밀번호가 변경되었습니다.");
-    } catch {
-      showToast("비밀번호 변경에 실패했습니다.", "error");
+    } catch (err) {
+      const msg = err?.response?.data?.message ?? err?.response?.data?.error ?? "비밀번호 변경에 실패했습니다.";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -232,12 +234,12 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
               </div>
             </div>
             <div>
-              <p className="text-xs text-[#94A3B8] mb-1">변경할 닉네임 <span className="text-[#CBD5E1]">(최대 10자)</span></p>
+              <p className="text-xs text-[#94A3B8] mb-1">변경할 닉네임 <span className="text-[#CBD5E1]">(최대 20자)</span></p>
               <input
                 type="text"
                 value={newNickname}
                 onChange={(e) => handleNicknameChange(e.target.value)}
-                maxLength={10}
+                maxLength={20}
                 className={`w-full px-4 py-2.5 rounded-xl border text-sm text-[#1E293B] focus:outline-none transition-colors
                   ${nicknameError ? "border-[#EF4444] focus:border-[#EF4444]" : "border-[#E2E8F0] focus:border-[#1D4ED8]"}`}
                 placeholder="새 닉네임 입력"
@@ -248,7 +250,7 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
                 ) : (
                   <span />
                 )}
-                <p className="text-xs text-[#94A3B8]">{newNickname.length}/10</p>
+                <p className="text-xs text-[#94A3B8]">{newNickname.length}/20</p>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
@@ -332,7 +334,14 @@ function AccountSection({ user, onUserUpdate, onDeleteAccount }) {
           message="정말로 탈퇴하시겠습니까? 모든 데이터가 영구적으로 삭제되며 복구할 수 없습니다."
           confirmLabel="탈퇴하기"
           danger
-          onConfirm={onDeleteAccount}
+          onConfirm={async () => {
+            try {
+              setShowDeleteConfirm(false);
+              await onDeleteAccount();
+            } catch {
+              showToast("회원 탈퇴에 실패했습니다.", "error");
+            }
+          }}
           onCancel={() => setShowDeleteConfirm(false)}
         />
       )}
@@ -684,13 +693,9 @@ function MyPage() {
   };
 
   const handleDeleteAccount = async () => {
-    try {
-      await usersApi.deleteAccount();
-      logout();
-      navigate("/");
-    } catch {
-      // 탈퇴 실패 시 별도 UI 없이 조용히 처리 (사용자는 그대로 페이지에 남음)
-    }
+    await usersApi.deleteAccount();
+    logout();
+    navigate("/");
   };
 
   const SECTION_TITLES = {
