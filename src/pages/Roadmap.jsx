@@ -682,6 +682,8 @@ const CHART_COLORS = [
 // 진행 중인 갭 분석 작업 ID — 새로고침·페이지 이동 후 같은 검색어로 돌아오면 이어서 폴링한다.
 // sessionStorage가 막힌 환경(사생활 보호 모드 등)에서는 조용히 무시한다.
 const GAP_JOB_KEY = "clip.gapJob";
+// 교차 비교(CoT3)는 최소 2편이 필요하다
+const MIN_GAP_PAPERS = 2;
 
 function saveGapJob(jobId, query) {
   try {
@@ -844,7 +846,7 @@ function PaperSelectModal({
             </button>
           </div>
           <p className="text-xs text-[#64748B] mt-1.5">
-            퓨쳐워크를 탐색할 논문 10~15개를 선택해주세요.
+            퓨쳐워크를 탐색할 논문을 {MIN_GAP_PAPERS}편 이상 선택해주세요.
           </p>
         </div>
 
@@ -904,10 +906,29 @@ function PaperSelectModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 pb-5 pt-3 border-t border-[#F1F5F9] flex justify-end">
+        <div className="px-6 pb-5 pt-3 border-t border-[#F1F5F9] flex items-center justify-between gap-4">
+          {/* 실행 전 요약 — 시작하면 무엇이 일어나는지 미리 알려준다 */}
+          <div className="min-w-0">
+            {selectedIds.size >= MIN_GAP_PAPERS ? (
+              <>
+                <p className="text-xs font-semibold text-[#1E293B]">
+                  선택 {selectedIds.size}편 · 7단계 검증 · 보통 5~10분
+                </p>
+                <p className="text-[11px] text-[#64748B] mt-0.5">
+                  다른 페이지에 다녀와도 이어서 볼 수 있고, 끝나면 알려드려요.
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-[#64748B]">
+                최소 {MIN_GAP_PAPERS}편을 선택해야 분석할 수 있어요.
+                {selectedIds.size > 0 && ` (현재 ${selectedIds.size}편)`}
+              </p>
+            )}
+          </div>
           <button
             onClick={onConfirm}
-            className="text-sm font-semibold px-5 py-2 rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors"
+            disabled={selectedIds.size < MIN_GAP_PAPERS}
+            className="flex-shrink-0 text-sm font-semibold px-5 py-2 rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors disabled:bg-[#C7D2FE] disabled:cursor-not-allowed"
           >
             {selectedIds.size > 0 ? `(${selectedIds.size}) 탐색` : "탐색"}
           </button>
@@ -1436,7 +1457,7 @@ function RoadmapFlow({
   }, [searchQuery, pollGapJob]);
 
   const handleConfirm = useCallback(() => {
-    if (!selectedIds.size) return;
+    if (selectedIds.size < MIN_GAP_PAPERS) return;
     runGapAnalysis(selectedIds);
   }, [selectedIds, runGapAnalysis]);
 
