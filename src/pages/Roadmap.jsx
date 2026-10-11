@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { useLocation } from "react-router-dom";
 import { roadmapApi, gapApi, paperApi, bookmarksApi, historyApi } from "@/api";
-import AnalysisProgressPanel from "@/components/AnalysisProgressPanel";
+import AnalysisProgressPanel, { describeJobFailure } from "@/components/AnalysisProgressPanel";
 import {
   EvaluationBadges,
   ProposalComparisonTable,
@@ -685,11 +685,11 @@ const GAP_JOB_KEY = "clip.gapJob";
 // 교차 비교(CoT3)는 최소 2편이 필요하다
 const MIN_GAP_PAPERS = 2;
 
-function saveGapJob(jobId, query) {
+function saveGapJob(jobId, query, paperIds) {
   try {
     sessionStorage.setItem(
       GAP_JOB_KEY,
-      JSON.stringify({ jobId, query: query ?? "" }),
+      JSON.stringify({ jobId, query: query ?? "", paperIds }),
     );
   } catch {}
 }
@@ -1371,6 +1371,9 @@ function RoadmapFlow({
   // 단계별 진행 상황 (AI 서버 작업 상태) — 하단 왼쪽 "분석 과정" 패널에 표시
   const [gapJob, setGapJob] = useState(null);
   const [leftTab, setLeftTab] = useState("share");
+  // 실패했을 때 같은 논문으로 다시 시도할 수 있도록 마지막 분석 논문 ID를 기억한다
+  const lastPaperIdsRef = useRef(null);
+  const [gapRetryable, setGapRetryable] = useState(false);
   // 오른쪽 결과 보기 방식 — 목록 / 비교표(CoT4·CoT5 판정을 제안별로 나란히)
   const [resultView, setResultView] = useState("list");
   // 폴링 루프를 식별하는 토큰 — 새 분석을 시작하면 이전 루프가 멈춘다
@@ -1425,21 +1428,19 @@ function RoadmapFlow({
       notifyAnalysisFinished(job.status === "completed");
       if (job.status === "completed") {
         setGapItems(parseGapContent(job.gap_content));
-      } else if (job.status === "no_candidates") {
-        setGapError(
-          "검증을 통과한 연구 공백 후보가 없습니다. 다른 논문 조합으로 다시 탐색해보세요.",
-        );
-      } else if (job.status === "timeout") {
-        setGapError(
-          "분석 시간이 초과되었습니다. 논문 수를 줄여 다시 시도해주세요.",
-        );
       } else {
-        setGapError("GAP 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        // 어느 단계에서 왜 멈췄는지 안내 (원문 부족·후보 없음·시간 초과·단계 실패)
+        const { message, retryable } = describeJobFailure(job);
+        setGapError(message);
+        setGapRetryable(retryable);
       }
     } catch {
       if (isCurrent()) {
         clearSavedGapJob();
-        setGapError("GAP 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        setGapError(
+          "분석 서버와 연결이 끊겼어요. 잠시 후 다시 시도해 주세요.",
+        );
+        setGapRetryable(true);
       }
     } finally {
       if (isCurrent()) setGapLoading(false);
@@ -1453,9 +1454,11 @@ function RoadmapFlow({
       const token = ++pollTokenRef.current;
       // 클릭 직후에 요청해야 브라우저가 권한 창을 띄워 준다
       requestAnalysisNotification();
+      lastPaperIdsRef.current = paperIds;
       setShowPaperModal(false);
       setGapLoading(true);
       setGapError("");
+      setGapRetryable(false);
       setGapItems([]);
       setGapJob(null);
       setLeftTab("progress");
@@ -1472,14 +1475,15 @@ function RoadmapFlow({
       } catch {
         if (pollTokenRef.current === token) {
           setGapError(
-            "GAP 분석을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.",
+            "분석을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.",
           );
+          setGapRetryable(true);
           setGapLoading(false);
         }
         return;
       }
       // 분석이 길어 새로고침·페이지 이동 후에도 이어서 볼 수 있도록 작업 ID를 저장
-      saveGapJob(jobId, searchQuery);
+      saveGapJob(jobId, searchQuery, paperIds);
       await pollGapJob(jobId, token);
     },
     [papers, searchQuery, pollGapJob],
@@ -1490,6 +1494,7 @@ function RoadmapFlow({
     const saved = loadSavedGapJob();
     if (!saved || saved.query !== (searchQuery ?? "")) return;
     const token = ++pollTokenRef.current;
+    lastPaperIdsRef.current = saved.paperIds ?? null;
     setGapLoading(true);
     setLeftTab("progress");
     pollGapJob(saved.jobId, token);
@@ -1805,13 +1810,30 @@ function RoadmapFlow({
           {/* 에러 상태 */}
           {gapError && !gapLoading && (
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <p className="text-xs text-red-500">{gapError}</p>
-              <button
-                onClick={() => setShowPaperModal(true)}
-                className="text-xs px-4 py-2 rounded-lg bg-[#EEF2FF] text-[#4F46E5] font-medium hover:bg-[#E0E7FF] transition-colors"
-              >
-                다시 탐색하기
-              </button>
+              <p className="text-xs text-red-600 text-center leading-relaxed max-w-[420px]">
+                {gapError}
+              </p>
+              {gapJob && (
+                <p className="text-[11px] text-[#64748B]">
+                  멈춘 단계는 왼쪽 '분석 과정'에서 확인할 수 있어요
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                {gapRetryable && lastPaperIdsRef.current?.length >= MIN_GAP_PAPERS && (
+                  <button
+                    onClick={() => runGapAnalysis(new Set(lastPaperIdsRef.current))}
+                    className="text-xs px-4 py-2 rounded-lg bg-[#4F46E5] text-white font-medium hover:bg-[#4338CA] transition-colors"
+                  >
+                    같은 논문으로 다시 시도
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowPaperModal(true)}
+                  className="text-xs px-4 py-2 rounded-lg bg-[#EEF2FF] text-[#4F46E5] font-medium hover:bg-[#E0E7FF] transition-colors"
+                >
+                  다른 논문 선택
+                </button>
+              </div>
             </div>
           )}
 

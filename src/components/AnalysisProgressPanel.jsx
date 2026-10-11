@@ -14,6 +14,44 @@ const STAGE_INFO = {
   CoT5: { label: "CoT5 · 신규성", desc: "로컬 문헌 검색 기반 신규성 판정" },
 };
 
+// 끝난 작업이 실패·시간 초과·후보 없음일 때 사용자에게 보여줄 안내.
+// retryable: 같은 논문으로 다시 시도해 볼 만한지 (원문이 없는 경우는 다시 해도 같은 결과)
+export function describeJobFailure(job) {
+  const stages = job?.stages ?? [];
+  const labelOf = (stage) => STAGE_INFO[stage?.stage]?.label ?? stage?.stage;
+
+  if (job?.status === "no_candidates") {
+    return {
+      message: "CoT3 교차 비교에서 검증을 통과한 연구 공백 후보가 없었어요. 다른 논문 조합으로 탐색하거나 같은 논문으로 한 번 더 시도해 보세요.",
+      retryable: true,
+    };
+  }
+
+  const download = stages.find((s) => s.stage === "download");
+  const papers = download?.data?.papers ?? [];
+  const missing = papers.filter((p) => p.ok === false).map((p) => p.title);
+  if (missing.length > 0 && papers.length - missing.length < 2) {
+    return {
+      message: `arXiv 원문(LaTeX)을 받을 수 있는 논문이 2편 미만이에요. 원문이 없는 논문: ${missing.join(", ")}`,
+      retryable: false,
+    };
+  }
+
+  const stopped = stages.find((s) => s.status === "failed");
+  if (job?.status === "timeout") {
+    return {
+      message: `분석 시간이 초과됐어요${stopped ? ` (${labelOf(stopped)} 단계 진행 중)` : ""}. 논문 수를 줄여 다시 시도해 주세요.`,
+      retryable: true,
+    };
+  }
+  return {
+    message: stopped
+      ? `${labelOf(stopped)} 단계에서 분석이 멈췄어요. 잠시 후 다시 시도해 주세요.`
+      : "GAP 분석에 실패했어요. 잠시 후 다시 시도해 주세요.",
+    retryable: true,
+  };
+}
+
 const SUBGOAL_SEGMENTS = [
   { key: "achieved", label: "달성", color: STATUS_COLOR.good },
   { key: "partially_achieved", label: "부분 달성", color: STATUS_COLOR.warning },
