@@ -8,6 +8,11 @@ import React, {
 import { useLocation } from "react-router-dom";
 import { roadmapApi, gapApi, paperApi, bookmarksApi, historyApi } from "@/api";
 import AnalysisProgressPanel, { describeJobFailure } from "@/components/AnalysisProgressPanel";
+import useNotificationStore, {
+  notifyAnalysisFinished,
+  requestAnalysisNotification,
+} from "@/store/useNotificationStore";
+import { saveGapJob, loadSavedGapJob, clearSavedGapJob } from "@/store/gapJobSession";
 import {
   EvaluationBadges,
   ProposalComparisonTable,
@@ -749,73 +754,10 @@ const CHART_COLORS = [
   "#F97316",
 ];
 
-// GAP 분석 결과 JSON 파싱 — 마크다운 코드블록이 포함되어 있을 수 있어 제거 후 파싱
-// 진행 중인 갭 분석 작업 ID — 새로고침·페이지 이동 후 같은 검색어로 돌아오면 이어서 폴링한다.
-// sessionStorage가 막힌 환경(사생활 보호 모드 등)에서는 조용히 무시한다.
-const GAP_JOB_KEY = "clip.gapJob";
 // 교차 비교(CoT3)는 최소 2편이 필요하다
 const MIN_GAP_PAPERS = 2;
 
-function saveGapJob(jobId, query, paperIds) {
-  try {
-    sessionStorage.setItem(
-      GAP_JOB_KEY,
-      JSON.stringify({ jobId, query: query ?? "", paperIds }),
-    );
-  } catch {}
-}
-
-function loadSavedGapJob() {
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(GAP_JOB_KEY) ?? "null");
-    return saved?.jobId ? saved : null;
-  } catch {
-    return null;
-  }
-}
-
-function clearSavedGapJob() {
-  try {
-    sessionStorage.removeItem(GAP_JOB_KEY);
-  } catch {}
-}
-
-// 분석이 끝났을 때 다른 탭에 있어도 알 수 있도록 브라우저 알림과 탭 제목으로 알린다.
-// 알림 권한은 사용자가 분석을 시작할 때(클릭 직후) 한 번만 요청한다.
-function requestAnalysisNotification() {
-  try {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().catch(() => {});
-    }
-  } catch {}
-}
-
-function notifyAnalysisFinished(succeeded) {
-  // 이 창을 보고 있으면 결과가 바로 보이므로 알리지 않는다.
-  // 다른 탭(hidden)뿐 아니라 다른 앱으로 전환한 경우(창은 보이지만 포커스 없음)도 알린다.
-  if (!document.hidden && document.hasFocus()) return;
-  const label = succeeded ? "✓ 분석 완료" : "분석 실패";
-  const originalTitle = document.title;
-  document.title = `${label} · ${originalTitle}`;
-  const restoreTitle = () => {
-    if (document.hidden) return;
-    document.title = originalTitle;
-    document.removeEventListener("visibilitychange", restoreTitle);
-    window.removeEventListener("focus", restoreTitle);
-  };
-  document.addEventListener("visibilitychange", restoreTitle);
-  window.addEventListener("focus", restoreTitle);
-  try {
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(`CLIP ${label}`, {
-        body: succeeded
-          ? "추천 아이디어와 검증 결과를 확인해 보세요."
-          : "분석 과정에서 어느 단계가 멈췄는지 확인해 보세요.",
-      });
-    }
-  } catch {}
-}
-
+// GAP 분석 결과 JSON 파싱 — 마크다운 코드블록이 포함되어 있을 수 있어 제거 후 파싱
 function parseGapContent(content) {
   if (!content) return [];
   const tryParse = (val) => {
@@ -1478,6 +1420,8 @@ function RoadmapFlow({
       mountedRef.current && pollTokenRef.current === token;
     let job;
     let failures = 0;
+    // 이 화면이 직접 조회하는 동안 상단 감시자는 같은 작업을 건너뛴다
+    useNotificationStore.getState().setActiveJobId(jobId);
     try {
       while (isCurrent()) {
         try {
@@ -1494,9 +1438,15 @@ function RoadmapFlow({
       }
       // 페이지를 떠나 멈춘 경우에는 저장된 작업을 남겨 두어 돌아왔을 때 이어서 본다
       if (!isCurrent() || !job) return;
+      const saved = loadSavedGapJob();
       clearSavedGapJob();
 
-      notifyAnalysisFinished(job.status === "completed");
+      notifyAnalysisFinished({
+        jobId,
+        succeeded: job.status === "completed",
+        query: saved?.query,
+        paperCount: saved?.paperIds?.length,
+      });
       if (job.status === "completed") {
         setGapItems(parseGapContent(job.gap_content));
       } else {
@@ -1515,6 +1465,8 @@ function RoadmapFlow({
       }
     } finally {
       if (isCurrent()) setGapLoading(false);
+      const store = useNotificationStore.getState();
+      if (store.activeJobId === jobId) store.setActiveJobId(null);
     }
   }, []);
 
