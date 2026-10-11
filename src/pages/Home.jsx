@@ -198,22 +198,31 @@ function Home() {
   const bookmarkCount = bookmarks.length;
   const historyCount = history.length;
 
-  // 북마크 중 가장 많이 저장한 카테고리 계산
-  const topCategory = useMemo(() => {
-    if (!bookmarks.length) return "-";
+  // 가장 많이 검색한 키워드 — 서버 검색 기록이 없으면 이 브라우저의 최근 검색어로 대신한다
+  // (북마크 카테고리는 대부분 cs.AI라 의미가 없어 검색 키워드로 바꿈)
+  const topKeyword = useMemo(() => {
+    // 대소문자만 다른 검색어(claude / CLAUDE)는 같은 키워드로 센다 — 표시는 가장 최근 표기
     const freq = {};
-    bookmarks.forEach((b) => {
-      const cat = b.category || b.privaryCategory || b.primaryCategory;
-      if (cat) freq[cat] = (freq[cat] || 0) + 1;
+    history.forEach(({ keyword }) => {
+      const k = keyword?.trim();
+      if (!k) return;
+      const key = k.toLowerCase();
+      freq[key] ??= { label: k, count: 0 };
+      freq[key].count += 1;
     });
-    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
-    return sorted[0]?.[0] ?? "-";
-  }, [bookmarks]);
+    const top = Object.values(freq).sort((a, b) => b.count - a.count)[0];
+    if (top) return { label: "가장 많이 검색한 키워드", value: top.label };
+    try {
+      const recent = JSON.parse(localStorage.getItem("clip_recent_searches"))?.[0]?.query;
+      if (recent) return { label: "최근 검색한 키워드", value: recent };
+    } catch {}
+    return { label: "가장 많이 검색한 키워드", value: "-" };
+  }, [history]);
 
   const myStatus = [
     { label: "편을 저장했어요", value: bookmarkCount },
     { label: "개의 키워드를 검색했어요", value: historyCount },
-    { label: "최근에 많이 스크랩한 키워드", value: topCategory },
+    topKeyword,
   ];
 
   // 검색 기록과 북마크를 합쳐 최근 활동 목록 생성 (최대 3개)
@@ -448,9 +457,10 @@ function Home() {
                   {loading ? (
                     <div className="h-8 w-12 rounded bg-gray-200 animate-pulse mt-1" />
                   ) : (
-                    // 숫자는 크게, 텍스트(카테고리명)는 약간 작게 표시
+                    // 숫자는 크게, 텍스트(키워드)는 작게 두 줄까지 표시
                     <p
-                      className={`font-bold ${typeof s.value === "number" ? "text-[30px] text-[#0060AD]" : "text-[22px] text-[#173355]"}`}
+                      title={typeof s.value === "string" ? s.value : undefined}
+                      className={`font-bold ${typeof s.value === "number" ? "text-[30px] text-[#0060AD]" : "text-[16px] leading-snug text-[#173355] line-clamp-2 break-words"}`}
                     >
                       {s.value ?? 0}
                     </p>
