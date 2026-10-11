@@ -314,8 +314,79 @@ function parseData(data) {
   }));
 }
 
-// 서버 응답 형태가 다를 수 있어 roots 위치를 여러 경로에서 탐색
+// 백엔드 main 형식 { keyword?, topics: [{ id, label, papers: [{ id, title, abstracts, author, createdDate, privaryCategory }] }] }
+// 을 화면이 쓰는 roots 형식(카테고리 → 토픽 → 논문)으로 바꾼다.
+// 토픽 id는 "cs.AI::artificial_intelligence"(로드맵) 또는 "topic::<검색어>::cs.CY"(검색) 형태다.
+function categoryOfTopic(topic) {
+  const parts = String(topic.id ?? "").split("::");
+  const fromId = parts[0] === "topic" ? parts[parts.length - 1] : parts[0];
+  if (/^[a-z-]+\.[A-Za-z-]+$/.test(fromId)) return fromId;
+  return topic.papers?.[0]?.privaryCategory || topic.label || "기타";
+}
+
+function topicsToRoadmap(topics) {
+  const byCategory = new Map();
+  for (const topic of topics) {
+    const category = categoryOfTopic(topic);
+    if (!byCategory.has(category)) byCategory.set(category, []);
+    byCategory.get(category).push({
+      node_id: topic.id,
+      label: topic.label,
+      children: (topic.papers ?? []).map((paper) => ({
+        paper_id: paper.id ?? paper.paper_id,
+        title: paper.title,
+      })),
+    });
+  }
+  return {
+    generated_at: new Date().toISOString(),
+    roots: [...byCategory].map(([category, nodes]) => ({
+      arxiv_primary_category: category,
+      intermediate_nodes: nodes,
+    })),
+  };
+}
+
+// topics 형식의 논문을 검색 결과 논문 형식(paper_id, title, abstract, categories ...)으로 맞춘다
+function normalizeTopicPaper(paper) {
+  const id = paper.id ?? paper.paper_id ?? paper.arxiv_id;
+  const category = paper.privaryCategory ?? paper.primary_category;
+  return {
+    ...paper,
+    paper_id: id,
+    arxiv_id: id,
+    abstract: paper.abstracts ?? paper.abstract,
+    authors: paper.author ? paper.author.split(", ") : paper.authors,
+    primary_category: category,
+    categories: paper.categories ?? (category ? [category] : []),
+    published: paper.createdDate ?? paper.published,
+  };
+}
+
+// 응답에서 논문 목록을 꺼낸다 — papers 배열이 없으면 topics 안의 논문을 중복 없이 모은다
+function extractPapers(data) {
+  const direct = data?.papers ?? data?.data?.papers;
+  if (direct?.length) return direct;
+  const topics = data?.topics ?? data?.data?.topics;
+  if (!Array.isArray(topics)) return [];
+  const seen = new Set();
+  const list = [];
+  for (const topic of topics) {
+    for (const paper of topic.papers ?? []) {
+      const normalized = normalizeTopicPaper(paper);
+      if (normalized.paper_id && !seen.has(normalized.paper_id)) {
+        seen.add(normalized.paper_id);
+        list.push(normalized);
+      }
+    }
+  }
+  return list;
+}
+
+// 서버 응답 형태가 다를 수 있어 roots 위치를 여러 경로에서 탐색 (topics 형식이면 roots로 변환)
 function resolveRoadmapData(data) {
+  const topics = data?.topics ?? data?.data?.topics;
+  if (!data?.roots && Array.isArray(topics)) return topicsToRoadmap(topics);
   return data?.roots
     ? data
     : data?.data?.roots
@@ -2164,8 +2235,8 @@ function Roadmap() {
 
   // 논문 데이터 우선순위: 검색 결과 → API 응답 → 로드맵 노드에서 추출
   const papers = useMemo(() => {
-    const searchPapers = state?.searchResult?.papers;
-    if (searchPapers?.length > 0) return searchPapers;
+    const searchPapers = extractPapers(state?.searchResult);
+    if (searchPapers.length > 0) return searchPapers;
     if (apiPapers.length > 0) return apiPapers;
     // 로드맵 노드에서 paper_id만 추출 (중복 제거)
     const seen = new Set();
@@ -2182,7 +2253,7 @@ function Roadmap() {
       }
     }
     return list;
-  }, [roadmapData, state?.searchResult?.papers, apiPapers]);
+  }, [roadmapData, state?.searchResult, apiPapers]);
 
   useEffect(() => {
     let ignore = false;
@@ -2203,7 +2274,7 @@ function Roadmap() {
           searchQuery ? { keyword: searchQuery } : undefined,
         );
         const nextData = resolveRoadmapData(data);
-        const responsePapers = data?.papers ?? data?.data?.papers ?? [];
+        const responsePapers = extractPapers(data);
         if (!ignore) {
           if (nextData) {
             setRoadmapData(nextData);
