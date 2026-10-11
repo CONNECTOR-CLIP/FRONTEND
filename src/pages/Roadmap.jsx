@@ -709,6 +709,42 @@ function clearSavedGapJob() {
   } catch {}
 }
 
+// 분석이 끝났을 때 다른 탭에 있어도 알 수 있도록 브라우저 알림과 탭 제목으로 알린다.
+// 알림 권한은 사용자가 분석을 시작할 때(클릭 직후) 한 번만 요청한다.
+function requestAnalysisNotification() {
+  try {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  } catch {}
+}
+
+function notifyAnalysisFinished(succeeded) {
+  // 이 창을 보고 있으면 결과가 바로 보이므로 알리지 않는다.
+  // 다른 탭(hidden)뿐 아니라 다른 앱으로 전환한 경우(창은 보이지만 포커스 없음)도 알린다.
+  if (!document.hidden && document.hasFocus()) return;
+  const label = succeeded ? "✓ 분석 완료" : "분석 실패";
+  const originalTitle = document.title;
+  document.title = `${label} · ${originalTitle}`;
+  const restoreTitle = () => {
+    if (document.hidden) return;
+    document.title = originalTitle;
+    document.removeEventListener("visibilitychange", restoreTitle);
+    window.removeEventListener("focus", restoreTitle);
+  };
+  document.addEventListener("visibilitychange", restoreTitle);
+  window.addEventListener("focus", restoreTitle);
+  try {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(`CLIP ${label}`, {
+        body: succeeded
+          ? "추천 아이디어와 검증 결과를 확인해 보세요."
+          : "분석 과정에서 어느 단계가 멈췄는지 확인해 보세요.",
+      });
+    }
+  } catch {}
+}
+
 function parseGapContent(content) {
   if (!content) return [];
   const tryParse = (val) => {
@@ -1386,6 +1422,7 @@ function RoadmapFlow({
       if (!isCurrent() || !job) return;
       clearSavedGapJob();
 
+      notifyAnalysisFinished(job.status === "completed");
       if (job.status === "completed") {
         setGapItems(parseGapContent(job.gap_content));
       } else if (job.status === "no_candidates") {
@@ -1414,6 +1451,8 @@ function RoadmapFlow({
     async (ids) => {
       const paperIds = [...ids];
       const token = ++pollTokenRef.current;
+      // 클릭 직후에 요청해야 브라우저가 권한 창을 띄워 준다
+      requestAnalysisNotification();
       setShowPaperModal(false);
       setGapLoading(true);
       setGapError("");
