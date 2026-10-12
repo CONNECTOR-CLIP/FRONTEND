@@ -172,6 +172,15 @@ function Research() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 키워드 태그를 누르면 검색창에 채운다 ("All"은 검색창 비우기)
+  const selectTag = (tag) => {
+    setQuery(tag === "All" ? "" : tag);
+    setSearchError("");
+    // 포커스만 옮기고 최근 검색 드롭다운은 열지 않는다 (태그를 가리지 않도록)
+    inputRef.current?.focus();
+    setFocused(false);
+  };
+
   // 드롭다운에서 최근 검색어 선택 시 input에 채우기
   const selectRecent = (item) => {
     setQuery(item.query);
@@ -319,27 +328,38 @@ function Research() {
           </p>
         )}
 
-        {/* 필터 태그 — 트렌드 API 응답으로 동적 갱신됨 */}
+        {/* 키워드 태그 — 트렌드 API 응답으로 동적 갱신됨. 누르면 검색창에 채워짐 */}
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-2 justify-center">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-colors
-                  ${tag === "All"
-                    ? "bg-[#EFF3FF] border-[#C7D7FE] text-[#3B5BDB] font-medium"
-                    : "bg-white border-[#E2E8F0] text-[#475569]"
-                  }`}
-              >
-                {tag}
-                <button
-                  onClick={() => removeTag(tag)}
-                  className="text-current opacity-50 hover:opacity-100 transition-opacity leading-none"
+            {tags.map((tag) => {
+              // 검색창에 들어 있는 키워드(검색창이 비어 있으면 "All")를 강조
+              const active = tag === "All" ? !query.trim() : query.trim() === tag;
+              return (
+                <span
+                  key={tag}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-colors
+                    ${active
+                      ? "bg-[#EFF3FF] border-[#C7D7FE] text-[#3B5BDB] font-medium"
+                      : "bg-white border-[#E2E8F0] text-[#475569] hover:border-[#C7D7FE] hover:text-[#3B5BDB]"
+                    }`}
                 >
-                  ×
-                </button>
-              </span>
-            ))}
+                  <button type="button" onClick={() => selectTag(tag)}>
+                    {tag}
+                  </button>
+                  {/* "All"은 삭제 불가 */}
+                  {tag !== "All" && (
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      aria-label={`${tag} 삭제`}
+                      className="text-current opacity-50 hover:opacity-100 transition-opacity leading-none"
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              );
+            })}
           </div>
         )}
       </div>

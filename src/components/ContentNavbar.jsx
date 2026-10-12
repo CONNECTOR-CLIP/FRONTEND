@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AlertModal from "./AlertModal";
+import GapJobWatcher from "./GapJobWatcher";
+import useNotificationStore from "@/store/useNotificationStore";
 
 // 서비스 내부 상단 네비게이션 바 — 로그인 후 모든 페이지에서 사용
 const NAV_ITEMS = [
@@ -76,7 +78,11 @@ function ContentNavbar() {
   const { pathname } = useLocation();
   const [showalert, setShowalert] = useState(false);
   const [comingSoon, setComingSoon] = useState(false);
-  const hasAlert = true; // 알림 뱃지 표시 여부 (추후 서버 연동 예정)
+  // 읽지 않은 알림(갭 분석 완료·실패)이 있으면 빨간 뱃지 표시
+  const hasAlert = useNotificationStore((s) =>
+    s.notifications.some((n) => !n.read),
+  );
+  const closeAlert = useCallback(() => setShowalert(false), []);
 
   const handleNavClick = (path) => {
     // 준비중인 메뉴는 이동 막고 토스트 2.5초 후 자동 숨김
@@ -159,46 +165,50 @@ function ContentNavbar() {
             </div>
 
             <div className="flex gap-5">
-              {/* 알림 버튼 — hasAlert 여부에 따라 빨간 뱃지 표시 */}
-              <button
-                onClick={() => setShowalert(true)}
-                className="relative p-1 cursor-pointer"
-              >
-                {hasAlert ? (
-                  <svg
-                    width="17"
-                    height="20"
-                    viewBox="0 0 17 20"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M0 17V15H2V8C2 6.61667 2.41667 5.3875 3.25 4.3125C4.08333 3.2375 5.16667 2.53333 6.5 2.2V1.5C6.5 1.08333 6.64583 0.729167 6.9375 0.4375C7.22917 0.145833 7.58333 0 8 0C8.41667 0 8.77083 0.145833 9.0625 0.4375C9.35417 0.729167 9.5 1.08333 9.5 1.5V2.2C10.8333 2.53333 11.9167 3.2375 12.75 4.3125C13.5833 5.3875 14 6.61667 14 8V15H16V17H0ZM8 20C7.45 20 6.97917 19.8042 6.5875 19.4125C6.19583 19.0208 6 18.55 6 18H10C10 18.55 9.80417 19.0208 9.4125 19.4125C9.02083 19.8042 8.55 20 8 20ZM4 15H12V8C12 6.9 11.6083 5.95833 10.825 5.175C10.0417 4.39167 9.1 4 8 4C6.9 4 5.95833 4.39167 5.175 5.175C4.39167 5.95833 4 6.9 4 8V15Z"
-                      fill="#466084"
-                    />
-                    <rect
-                      x="8.01172"
-                      width="8"
-                      height="8"
-                      rx="4"
-                      fill="#AC3434"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    width="16"
-                    height="20"
-                    viewBox="0 0 16 20"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M0 17V15H2V8C2 6.61667 2.41667 5.3875 3.25 4.3125C4.08333 3.2375 5.16667 2.53333 6.5 2.2V1.5C6.5 1.08333 6.64583 0.729167 6.9375 0.4375C7.22917 0.145833 7.58333 0 8 0C8.41667 0 8.77083 0.145833 9.0625 0.4375C9.35417 0.729167 9.5 1.08333 9.5 1.5V2.2C10.8333 2.53333 11.9167 3.2375 12.75 4.3125C13.5833 5.3875 14 6.61667 14 8V15H16V17H0ZM8 20C7.45 20 6.97917 19.8042 6.5875 19.4125C6.19583 19.0208 6 18.55 6 18H10C10 18.55 9.80417 19.0208 9.4125 19.4125C9.02083 19.8042 8.55 20 8 20ZM4 15H12V8C12 6.9 11.6083 5.95833 10.825 5.175C10.0417 4.39167 9.1 4 8 4C6.9 4 5.95833 4.39167 5.175 5.175C4.39167 5.95833 4 6.9 4 8V15Z"
-                      fill="#466084"
-                    />
-                  </svg>
-                )}
-              </button>
+              {/* 알림 버튼 — hasAlert 여부에 따라 빨간 뱃지 표시, 누르면 아래에 알림 목록 */}
+              <div className="relative flex items-center">
+                <button
+                  onClick={() => setShowalert((v) => !v)}
+                  aria-label="알림"
+                  className="relative p-1 cursor-pointer"
+                >
+                  {hasAlert ? (
+                    <svg
+                      width="17"
+                      height="20"
+                      viewBox="0 0 17 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M0 17V15H2V8C2 6.61667 2.41667 5.3875 3.25 4.3125C4.08333 3.2375 5.16667 2.53333 6.5 2.2V1.5C6.5 1.08333 6.64583 0.729167 6.9375 0.4375C7.22917 0.145833 7.58333 0 8 0C8.41667 0 8.77083 0.145833 9.0625 0.4375C9.35417 0.729167 9.5 1.08333 9.5 1.5V2.2C10.8333 2.53333 11.9167 3.2375 12.75 4.3125C13.5833 5.3875 14 6.61667 14 8V15H16V17H0ZM8 20C7.45 20 6.97917 19.8042 6.5875 19.4125C6.19583 19.0208 6 18.55 6 18H10C10 18.55 9.80417 19.0208 9.4125 19.4125C9.02083 19.8042 8.55 20 8 20ZM4 15H12V8C12 6.9 11.6083 5.95833 10.825 5.175C10.0417 4.39167 9.1 4 8 4C6.9 4 5.95833 4.39167 5.175 5.175C4.39167 5.95833 4 6.9 4 8V15Z"
+                        fill="#466084"
+                      />
+                      <rect
+                        x="8.01172"
+                        width="8"
+                        height="8"
+                        rx="4"
+                        fill="#AC3434"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="16"
+                      height="20"
+                      viewBox="0 0 16 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M0 17V15H2V8C2 6.61667 2.41667 5.3875 3.25 4.3125C4.08333 3.2375 5.16667 2.53333 6.5 2.2V1.5C6.5 1.08333 6.64583 0.729167 6.9375 0.4375C7.22917 0.145833 7.58333 0 8 0C8.41667 0 8.77083 0.145833 9.0625 0.4375C9.35417 0.729167 9.5 1.08333 9.5 1.5V2.2C10.8333 2.53333 11.9167 3.2375 12.75 4.3125C13.5833 5.3875 14 6.61667 14 8V15H16V17H0ZM8 20C7.45 20 6.97917 19.8042 6.5875 19.4125C6.19583 19.0208 6 18.55 6 18H10C10 18.55 9.80417 19.0208 9.4125 19.4125C9.02083 19.8042 8.55 20 8 20ZM4 15H12V8C12 6.9 11.6083 5.95833 10.825 5.175C10.0417 4.39167 9.1 4 8 4C6.9 4 5.95833 4.39167 5.175 5.175C4.39167 5.95833 4 6.9 4 8V15Z"
+                        fill="#466084"
+                      />
+                    </svg>
+                  )}
+                </button>
+                {showalert && <AlertModal onClose={closeAlert} />}
+              </div>
 
               {/* 설정 */}
               <button className="p-1 cursor-pointer">
@@ -234,7 +244,8 @@ function ContentNavbar() {
         </div>
       </nav>
 
-      {showalert && <AlertModal onClose={() => setShowalert(false)} />}
+      {/* 로드맵 화면을 떠나 있어도 진행 중인 갭 분석이 끝나면 벨로 알린다 */}
+      <GapJobWatcher />
 
       {/* 준비중 토스트 — 2.5초 후 자동 사라짐 */}
       {comingSoon && (
