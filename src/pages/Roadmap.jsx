@@ -961,7 +961,7 @@ function PaperSelectModal({
             {selectedIds.size >= MIN_GAP_PAPERS ? (
               <>
                 <p className="text-xs font-semibold text-[#1E293B]">
-                  선택 {selectedIds.size}편 · 7단계 검증 · 보통 5~10분
+                  선택 {selectedIds.size}편 · 5단계 분석 · 보통 2~3분
                 </p>
                 <p className="text-[11px] text-[#64748B] mt-0.5">
                   다른 페이지에 다녀와도 이어서 볼 수 있고, 끝나면 알려드려요.
