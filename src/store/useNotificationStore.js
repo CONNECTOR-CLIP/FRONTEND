@@ -64,25 +64,37 @@ export function requestAnalysisNotification() {
 
 // 분석이 끝나면 상단 벨 목록에 남기고, 사용자가 이 창을 보고 있지 않으면 탭 제목과 브라우저 알림으로도 알린다.
 // 로드맵 화면과 상단 감시자 양쪽에서 불릴 수 있어 작업 ID로 한 번만 처리한다.
+// kind: "analysis"(기본 분석) | "verify"(고른 아이디어 심화 검증)
 export function notifyAnalysisFinished({
   jobId,
+  kind = "analysis",
   succeeded,
   query,
   paperCount,
+  ideaCount,
 }) {
   const watching = !document.hidden && document.hasFocus();
   const added = useNotificationStore.getState().add({
     id: jobId,
+    kind,
     succeeded,
     query: query ?? "",
     paperCount: paperCount ?? null,
+    ideaCount: ideaCount ?? null,
     createdAt: new Date().toISOString(),
     // 로드맵 화면을 보고 있으면 결과를 이미 본 것이므로 읽음 처리
     read: watching && window.location.pathname === "/roadmap",
   });
   if (!added || watching) return;
 
-  const label = succeeded ? "✓ 분석 완료" : "분석 실패";
+  const verify = kind === "verify";
+  const label = verify
+    ? succeeded
+      ? "✓ 검증 완료"
+      : "검증 실패"
+    : succeeded
+      ? "✓ 분석 완료"
+      : "분석 실패";
   const originalTitle = document.title;
   document.title = `${label} · ${originalTitle}`;
   const restoreTitle = () => {
@@ -96,9 +108,13 @@ export function notifyAnalysisFinished({
   try {
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification(`CLIP ${label}`, {
-        body: succeeded
-          ? "추천 아이디어와 검증 결과를 확인해 보세요."
-          : "분석 과정에서 어느 단계가 멈췄는지 확인해 보세요.",
+        body: verify
+          ? succeeded
+            ? "고른 아이디어의 실현가능성·신규성 판정을 확인해 보세요."
+            : "검증 과정에서 어느 단계가 멈췄는지 확인해 보세요."
+          : succeeded
+            ? "추천 아이디어를 확인해 보세요. 원하는 아이디어는 골라서 심화 검증할 수 있어요."
+            : "분석 과정에서 어느 단계가 멈췄는지 확인해 보세요.",
       });
     }
   } catch {}

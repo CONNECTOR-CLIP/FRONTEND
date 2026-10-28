@@ -217,7 +217,7 @@ function FeasibilityDetail({ data }) {
       {results.map((r, i) => (
         <li key={i} className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold text-[#1E293B]">제안 {i + 1}</span>
+            <span className="text-[11px] font-semibold text-[#1E293B]">제안 {r.proposal_id ?? i + 1}</span>
             <VerdictBadge value={r.classification} />
             {r.confidence != null && (
               <span className="text-[10px] text-[#94A3B8]">확신도 {Math.round(r.confidence * 100)}%</span>
@@ -302,6 +302,15 @@ const JOB_MESSAGE = {
   timeout: "분석 시간이 초과되었습니다",
 };
 
+// 심화 검증(고른 아이디어만 CoT4 → CoT5) 작업의 상태 문구
+const VERIFY_MESSAGE = {
+  queued: "다른 검증이 끝나기를 기다리는 중입니다",
+  running: "검증 중",
+  completed: "검증 완료",
+  failed: "검증 중 오류가 발생했습니다",
+  timeout: "검증 시간이 초과되었습니다",
+};
+
 function AnalysisProgressPanel({ job }) {
   // 진행 중인 단계의 경과 시간을 1초마다 갱신
   const [now, setNow] = useState(() => Date.now() / 1000);
@@ -321,7 +330,7 @@ function AnalysisProgressPanel({ job }) {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-[#64748B]">
-          {JOB_MESSAGE[job.status] ?? job.status}
+          {(job.kind === "verify" ? VERIFY_MESSAGE : JOB_MESSAGE)[job.status] ?? job.status}
           {totalElapsed != null && ` · ${formatDuration(totalElapsed) || "0초"}`}
         </p>
         <p className="text-xs font-semibold text-[#1E293B]">
