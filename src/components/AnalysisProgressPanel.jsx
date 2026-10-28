@@ -5,7 +5,7 @@ import { STATUS_COLOR, CONCERN_LABELS, VerdictBadge } from "@/components/verdict
 // stages: [{ stage, status: pending|running|done|skipped|failed, started_at, finished_at, data }]
 
 const STAGE_INFO = {
-  download: { label: "논문 준비", desc: "arXiv 원문(LaTeX) 다운로드" },
+  download: { label: "논문 준비", desc: "arXiv 원문 다운로드 (LaTeX가 없으면 PDF에서 텍스트 변환)" },
   CoT1: { label: "CoT1 · 목표 분해", desc: "논문별 연구 목표와 달성 상태 분석" },
   CoT2: { label: "CoT2 · 한계 추출", desc: "원문에서 한계 후보 추출 후 검증" },
   CoT3: { label: "CoT3 · 교차 비교", desc: "논문 간 연구 공백 후보 생성·검증" },
@@ -32,7 +32,7 @@ export function describeJobFailure(job) {
   const missing = papers.filter((p) => p.ok === false).map((p) => p.title);
   if (missing.length > 0 && papers.length - missing.length < 2) {
     return {
-      message: `arXiv 원문(LaTeX)을 받을 수 있는 논문이 2편 미만이에요. 원문이 없는 논문: ${missing.join(", ")}`,
+      message: `원문을 읽을 수 있는 논문이 2편 미만이에요. 원문을 받지 못한 논문: ${missing.join(", ")}`,
       retryable: false,
     };
   }
@@ -95,7 +95,15 @@ function DownloadDetail({ data }) {
             {p.ok === false ? "✕" : p.ok ? "✓" : "·"}
           </span>
           <span className="truncate" title={p.title}>{p.title}</span>
-          {p.ok === false && <span className="text-[#94A3B8] whitespace-nowrap">(원문 없음 · 제외)</span>}
+          {p.ok === false && <span className="text-[#64748B] whitespace-nowrap">(원문 없음 · 제외)</span>}
+          {p.source === "pdf" && (
+            <span
+              className="flex-shrink-0 rounded px-1.5 py-px text-[10px] font-semibold bg-[#FEF3C7] text-[#92400E]"
+              title="arXiv에 LaTeX 원문이 없어 PDF에서 텍스트를 추출했어요. 수식·표는 원문과 다를 수 있어요."
+            >
+              PDF 변환
+            </span>
+          )}
         </li>
       ))}
     </ul>
