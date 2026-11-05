@@ -30,7 +30,7 @@ function Section({ title, children, aside }) {
   return (
     <section className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold text-[#6366F1]">{title}</p>
+        <p className="text-xs font-semibold text-[#6366F1]">{title}</p>
         {aside}
       </div>
       {children}
@@ -39,12 +39,12 @@ function Section({ title, children, aside }) {
 }
 
 function Empty({ children }) {
-  return <p className="text-xs text-[#94A3B8] leading-relaxed">{children}</p>;
+  return <p className="text-sm text-[#64748B] leading-relaxed">{children}</p>;
 }
 
 function Confidence({ value }) {
   if (value == null) return null;
-  return <span className="text-[11px] text-[#94A3B8]">확신도 {Math.round(value * 100)}%</span>;
+  return <span className="text-xs text-[#64748B]">확신도 {Math.round(value * 100)}%</span>;
 }
 
 export function FeasibilityEvidence({ feasibility }) {
@@ -58,11 +58,11 @@ export function FeasibilityEvidence({ feasibility }) {
           <VerdictBadge value={classification} />
           <Confidence value={confidence} />
         </div>
-        <p className="text-xs text-[#475569] leading-relaxed">{FEASIBILITY_MEANING[classification] ?? ""}</p>
+        <p className="text-sm text-[#475569] leading-relaxed">{FEASIBILITY_MEANING[classification] ?? ""}</p>
       </div>
 
       <Section title="판정 근거">
-        <p className="text-xs text-[#475569] leading-relaxed">{rationale || error || "근거가 기록되지 않았어요."}</p>
+        <p className="text-sm text-[#475569] leading-relaxed">{rationale || error || "근거가 기록되지 않았어요."}</p>
       </Section>
 
       {Object.keys(concerns).length > 0 && (
@@ -73,7 +73,7 @@ export function FeasibilityEvidence({ feasibility }) {
               if (!concern) return null;
               return (
                 <li key={key} className="flex gap-2">
-                  <span className="self-start flex items-center gap-1 w-16 shrink-0 text-[11px] font-semibold text-[#334155]">
+                  <span className="self-start flex items-center gap-1 w-16 shrink-0 text-xs font-semibold text-[#334155]">
                     <span
                       className="w-2 h-2 rounded-full"
                       style={concern.present ? { backgroundColor: STATUS_COLOR.serious } : { border: "1.5px solid #CBD5E1" }}
@@ -81,8 +81,8 @@ export function FeasibilityEvidence({ feasibility }) {
                     {label}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium text-[#64748B]">{concern.present ? "우려 있음" : "우려 없음"}</p>
-                    {concern.explanation && <p className="text-xs text-[#475569] leading-relaxed">{concern.explanation}</p>}
+                    <p className="text-xs font-medium text-[#64748B]">{concern.present ? "우려 있음" : "우려 없음"}</p>
+                    {concern.explanation && <p className="text-sm text-[#475569] leading-relaxed">{concern.explanation}</p>}
                   </div>
                 </li>
               );
@@ -92,10 +92,10 @@ export function FeasibilityEvidence({ feasibility }) {
       )}
 
       {missing.length > 0 && (
-        <Section title="누락된 제약 조건" aside={<span className="text-[10px] text-[#94A3B8]">{missing.length}개</span>}>
+        <Section title="누락된 제약 조건" aside={<span className="text-xs text-[#64748B]">{missing.length}개</span>}>
           <ul className="flex flex-col gap-1 list-disc pl-4">
             {missing.map((m, i) => (
-              <li key={i} className="text-xs text-[#475569] leading-relaxed">{m}</li>
+              <li key={i} className="text-sm text-[#475569] leading-relaxed">{m}</li>
             ))}
           </ul>
         </Section>
@@ -113,18 +113,18 @@ export function FeasibilityEvidence({ feasibility }) {
                   className={highlight ? "rounded-lg border px-3 py-2" : ""}
                   style={highlight ? { borderColor: STATUS_COLOR.warning, backgroundColor: "#FFFBEB" } : undefined}
                 >
-                  <p className="text-[11px] font-semibold text-[#334155] mb-0.5">
+                  <p className="text-xs font-semibold text-[#334155] mb-0.5">
                     {highlight && <span className="mr-1">?</span>}
                     {label}
                   </p>
                   {Array.isArray(value) ? (
                     <ul className="flex flex-col gap-0.5 list-disc pl-4">
                       {value.map((v, i) => (
-                        <li key={i} className="text-xs text-[#475569] leading-relaxed">{v}</li>
+                        <li key={i} className="text-sm text-[#475569] leading-relaxed">{v}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-xs text-[#475569] leading-relaxed">{value}</p>
+                    <p className="text-sm text-[#475569] leading-relaxed">{value}</p>
                   )}
                 </div>
               );
@@ -136,7 +136,7 @@ export function FeasibilityEvidence({ feasibility }) {
       {warnings.length > 0 && (
         <Section title="주의">
           {warnings.map((w, i) => (
-            <p key={i} className="text-xs text-[#475569] leading-relaxed">{w}</p>
+            <p key={i} className="text-sm text-[#475569] leading-relaxed">{w}</p>
           ))}
         </Section>
       )}
@@ -162,14 +162,14 @@ export function NoveltyEvidence({ novelty, missingReason }) {
       <div className="flex flex-col gap-1.5 rounded-xl bg-[#F8FAFC] px-3 py-2.5">
         <div className="flex items-center gap-2">
           <VerdictBadge value={classification} />
-          {evaluated != null && <span className="text-[11px] text-[#94A3B8]">로컬 문헌 {evaluated}편과 비교</span>}
+          {evaluated != null && <span className="text-xs text-[#64748B]">로컬 문헌 {evaluated}편과 비교</span>}
         </div>
-        <p className="text-xs text-[#475569] leading-relaxed">{reason || error}</p>
+        <p className="text-sm text-[#475569] leading-relaxed">{reason || error}</p>
       </div>
 
       {review && (
         <Section title="종합 검토">
-          <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-line">{review}</p>
+          <p className="text-sm text-[#475569] leading-relaxed whitespace-pre-line">{review}</p>
         </Section>
       )}
 
@@ -177,7 +177,7 @@ export function NoveltyEvidence({ novelty, missingReason }) {
         <Section
           title="비교한 논문"
           aside={
-            <span className="text-[10px] text-[#94A3B8]">
+            <span className="text-xs text-[#64748B]">
               동등한 연구 <span className="font-semibold text-[#1E293B]">{equivalentCount}</span> / {papers.length}편
             </span>
           }
@@ -186,26 +186,26 @@ export function NoveltyEvidence({ novelty, missingReason }) {
             {papers.map((p, i) => (
               <li key={p.paper_id ?? i} className="rounded-lg border border-[#E2E8F0] px-3 py-2">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-xs font-semibold text-[#1E293B] leading-snug">{p.paper_title || "제목 없음"}</p>
+                  <p className="text-sm font-semibold text-[#1E293B] leading-snug">{p.paper_title || "제목 없음"}</p>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <VerdictBadge value={p.equivalent ? "EQUIVALENT" : "DIFFERENT"} />
                     <Confidence value={p.confidence} />
                   </div>
                 </div>
                 {p.critical_difference && (
-                  <p className="mt-1 text-xs text-[#475569] leading-relaxed">
+                  <p className="mt-1 text-sm text-[#475569] leading-relaxed">
                     <span className="font-semibold text-[#334155]">결정적 차이 </span>
                     {p.critical_difference}
                   </p>
                 )}
                 <details className="mt-1.5 group">
-                  <summary className="cursor-pointer text-[11px] font-medium text-[#6366F1] select-none">항목별 비교 보기</summary>
+                  <summary className="cursor-pointer text-xs font-medium text-[#6366F1] select-none">항목별 비교 보기</summary>
                   <dl className="mt-1.5 flex flex-col gap-1.5">
                     {OVERLAP_FIELDS.map(({ key, label }) =>
                       p[key] ? (
                         <div key={key}>
-                          <dt className="text-[11px] font-semibold text-[#334155]">{label}</dt>
-                          <dd className="text-xs text-[#475569] leading-relaxed">{p[key]}</dd>
+                          <dt className="text-xs font-semibold text-[#334155]">{label}</dt>
+                          <dd className="text-sm text-[#475569] leading-relaxed">{p[key]}</dd>
                         </div>
                       ) : null,
                     )}
@@ -220,7 +220,7 @@ export function NoveltyEvidence({ novelty, missingReason }) {
       {warnings.length > 0 && (
         <Section title="주의">
           {warnings.map((w, i) => (
-            <p key={i} className="text-xs text-[#475569] leading-relaxed">{w}</p>
+            <p key={i} className="text-sm text-[#475569] leading-relaxed">{w}</p>
           ))}
         </Section>
       )}
