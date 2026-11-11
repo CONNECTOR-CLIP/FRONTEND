@@ -5,7 +5,7 @@ import { STATUS_COLOR, CONCERN_LABELS, VerdictBadge } from "@/components/verdict
 // stages: [{ stage, status: pending|running|done|skipped|failed, started_at, finished_at, data }]
 
 const STAGE_INFO = {
-  download: { label: "논문 준비", desc: "arXiv 원문(LaTeX) 다운로드" },
+  download: { label: "논문 준비", desc: "arXiv 원문 다운로드 (LaTeX가 없으면 PDF에서 텍스트 변환)" },
   CoT1: { label: "CoT1 · 목표 분해", desc: "논문별 연구 목표와 달성 상태 분석" },
   CoT2: { label: "CoT2 · 한계 추출", desc: "원문에서 한계 후보 추출 후 검증" },
   CoT3: { label: "CoT3 · 교차 비교", desc: "논문 간 연구 공백 후보 생성·검증" },
@@ -32,7 +32,7 @@ export function describeJobFailure(job) {
   const missing = papers.filter((p) => p.ok === false).map((p) => p.title);
   if (missing.length > 0 && papers.length - missing.length < 2) {
     return {
-      message: `arXiv 원문(LaTeX)을 받을 수 있는 논문이 2편 미만이에요. 원문이 없는 논문: ${missing.join(", ")}`,
+      message: `원문을 읽을 수 있는 논문이 2편 미만이에요. 원문을 받지 못한 논문: ${missing.join(", ")}`,
       retryable: false,
     };
   }
@@ -77,7 +77,7 @@ function StageIcon({ status }) {
   if (status === "running") {
     return <div className="w-5 h-5 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />;
   }
-  const base = "w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold";
+  const base = "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold";
   if (status === "done") return <div className={`${base} bg-[#6366F1] text-white`}>✓</div>;
   if (status === "failed") return <div className={`${base} text-white`} style={{ backgroundColor: STATUS_COLOR.critical }}>✕</div>;
   if (status === "skipped") return <div className={`${base} bg-[#E2E8F0] text-[#64748B]`}>–</div>;
@@ -90,12 +90,20 @@ function DownloadDetail({ data }) {
   return (
     <ul className="flex flex-col gap-1">
       {papers.map((p) => (
-        <li key={p.title} className="flex items-center gap-1.5 text-[11px] text-[#475569]">
+        <li key={p.title} className="flex items-center gap-1.5 text-xs text-[#475569]">
           <span style={{ color: p.ok === false ? STATUS_COLOR.critical : STATUS_COLOR.good }}>
             {p.ok === false ? "✕" : p.ok ? "✓" : "·"}
           </span>
           <span className="truncate" title={p.title}>{p.title}</span>
-          {p.ok === false && <span className="text-[#94A3B8] whitespace-nowrap">(원문 없음 · 제외)</span>}
+          {p.ok === false && <span className="text-[#64748B] whitespace-nowrap">(원문 없음 · 제외)</span>}
+          {p.source === "pdf" && (
+            <span
+              className="flex-shrink-0 rounded px-1.5 py-px text-xs font-semibold bg-[#FEF3C7] text-[#92400E]"
+              title="arXiv에 LaTeX 원문이 없어 PDF에서 텍스트를 추출했어요. 수식·표는 원문과 다를 수 있어요."
+            >
+              PDF 변환
+            </span>
+          )}
         </li>
       ))}
     </ul>
@@ -112,11 +120,11 @@ function SubgoalDetail({ data }) {
         const total = SUBGOAL_SEGMENTS.reduce((sum, seg) => sum + (p.subgoals[seg.key] ?? 0), 0);
         return (
           <div key={p.title}>
-            <div className="flex items-center justify-between text-[11px] text-[#475569] mb-1">
+            <div className="flex items-center justify-between text-xs text-[#475569] mb-1">
               <span className="truncate" title={p.title}>
                 <span className="font-semibold text-[#1E293B]">{p.ref}</span> {p.title}
               </span>
-              <span className="text-[#94A3B8] whitespace-nowrap ml-2">목표 {total}개</span>
+              <span className="text-[#64748B] whitespace-nowrap ml-2">목표 {total}개</span>
             </div>
             <div className="flex h-2.5 gap-[2px]">
               {SUBGOAL_SEGMENTS.map((seg) => {
@@ -135,7 +143,7 @@ function SubgoalDetail({ data }) {
           </div>
         );
       })}
-      <div className="flex gap-3 text-[10px] text-[#64748B]">
+      <div className="flex gap-3 text-xs text-[#64748B]">
         {SUBGOAL_SEGMENTS.map((seg) => (
           <span key={seg.key} className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: seg.color }} />
@@ -153,10 +161,10 @@ function LimitationDetail({ data }) {
   return (
     <ul className="flex flex-col gap-1">
       {papers.map((p) => (
-        <li key={p.title} className="flex items-center gap-2 text-[11px] text-[#475569]">
+        <li key={p.title} className="flex items-center gap-2 text-xs text-[#475569]">
           <span className="font-semibold text-[#1E293B]">{p.ref}</span>
           <span>추출 {p.limitations_raw}개</span>
-          <span className="text-[#94A3B8]">→</span>
+          <span className="text-[#64748B]">→</span>
           <span className="font-semibold text-[#1E293B]">검증 통과 {p.limitations}개</span>
         </li>
       ))}
@@ -167,19 +175,19 @@ function LimitationDetail({ data }) {
 // CoT3: 후보 깔때기 — 단계를 지날 때마다 남은 후보 수 (단일 색 가로 막대, 값은 막대 끝)
 function FunnelDetail({ data }) {
   const funnel = data.funnel ?? [];
-  if (!funnel.length) return <p className="text-[11px] text-[#94A3B8]">후보를 생성하는 중…</p>;
+  if (!funnel.length) return <p className="text-xs text-[#64748B]">후보를 생성하는 중…</p>;
   const max = Math.max(...funnel.map((f) => f.count), 1);
   return (
     <div className="flex flex-col gap-1.5">
       {funnel.map((f) => (
         <div key={f.label} className="flex items-center gap-2" title={`${f.label}: ${f.count}개`}>
-          <span className="w-24 shrink-0 text-[11px] text-[#475569]">{f.label}</span>
+          <span className="w-24 shrink-0 text-xs text-[#475569]">{f.label}</span>
           <div className="flex-1 flex items-center gap-1.5">
             <div
               className="h-2.5 rounded-r"
               style={{ width: `${Math.max((f.count / max) * 100, 4)}%`, backgroundColor: "#6366F1" }}
             />
-            <span className="text-[11px] font-semibold text-[#1E293B]">{f.count}</span>
+            <span className="text-xs font-semibold text-[#1E293B]">{f.count}</span>
           </div>
         </div>
       ))}
@@ -193,7 +201,7 @@ function ProposalDetail({ data }) {
   return (
     <ol className="flex flex-col gap-1">
       {proposals.map((p, i) => (
-        <li key={p.id ?? i} className="text-[11px] text-[#475569] leading-snug">
+        <li key={p.id ?? i} className="text-xs text-[#475569] leading-snug">
           <span className="font-semibold text-[#1E293B]">{i + 1}.</span> {firstSentence(p.direction)}
         </li>
       ))}
@@ -209,10 +217,10 @@ function FeasibilityDetail({ data }) {
       {results.map((r, i) => (
         <li key={i} className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold text-[#1E293B]">제안 {i + 1}</span>
+            <span className="text-xs font-semibold text-[#1E293B]">제안 {r.proposal_id ?? i + 1}</span>
             <VerdictBadge value={r.classification} />
             {r.confidence != null && (
-              <span className="text-[10px] text-[#94A3B8]">확신도 {Math.round(r.confidence * 100)}%</span>
+              <span className="text-xs text-[#64748B]">확신도 {Math.round(r.confidence * 100)}%</span>
             )}
           </div>
           {r.concerns && Object.keys(r.concerns).length > 0 && (
@@ -222,7 +230,7 @@ function FeasibilityDetail({ data }) {
                 return (
                   <span
                     key={key}
-                    className="flex items-center gap-1 text-[10px] text-[#64748B]"
+                    className="flex items-center gap-1 text-xs text-[#64748B]"
                     title={present ? `${label} 우려 있음` : `${label} 우려 없음`}
                   >
                     <span
@@ -244,16 +252,16 @@ function FeasibilityDetail({ data }) {
 // CoT5: 제안별 신규성 판정, 건너뛴 경우 사유
 function NoveltyDetail({ stage }) {
   if (stage.status === "skipped") {
-    return <p className="text-[11px] text-[#64748B]">{stage.data.reason ?? "건너뜀"}</p>;
+    return <p className="text-xs text-[#64748B]">{stage.data.reason ?? "건너뜀"}</p>;
   }
   const results = stage.data.results ?? [];
   if (!results.length && stage.status === "running") {
-    return <p className="text-[11px] text-[#94A3B8]">CoT4를 통과한 제안 {stage.data.ideas?.length ?? 0}개를 문헌과 비교하는 중…</p>;
+    return <p className="text-xs text-[#64748B]">CoT4를 통과한 제안 {stage.data.ideas?.length ?? 0}개를 문헌과 비교하는 중…</p>;
   }
   return (
     <ul className="flex flex-col gap-1.5">
       {results.map((r, i) => (
-        <li key={i} className="flex items-center gap-2 text-[11px] text-[#475569]">
+        <li key={i} className="flex items-center gap-2 text-xs text-[#475569]">
           <VerdictBadge value={r.classification} />
           <span className="truncate" title={r.title}>{r.title}</span>
         </li>
@@ -294,6 +302,15 @@ const JOB_MESSAGE = {
   timeout: "분석 시간이 초과되었습니다",
 };
 
+// 심화 검증(고른 아이디어만 CoT4 → CoT5) 작업의 상태 문구
+const VERIFY_MESSAGE = {
+  queued: "다른 검증이 끝나기를 기다리는 중입니다",
+  running: "검증 중",
+  completed: "검증 완료",
+  failed: "검증 중 오류가 발생했습니다",
+  timeout: "검증 시간이 초과되었습니다",
+};
+
 function AnalysisProgressPanel({ job }) {
   // 진행 중인 단계의 경과 시간을 1초마다 갱신
   const [now, setNow] = useState(() => Date.now() / 1000);
@@ -312,11 +329,11 @@ function AnalysisProgressPanel({ job }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-[#64748B]">
-          {JOB_MESSAGE[job.status] ?? job.status}
+        <p className="text-sm text-[#475569]">
+          {(job.kind === "verify" ? VERIFY_MESSAGE : JOB_MESSAGE)[job.status] ?? job.status}
           {totalElapsed != null && ` · ${formatDuration(totalElapsed) || "0초"}`}
         </p>
-        <p className="text-xs font-semibold text-[#1E293B]">
+        <p className="text-sm font-semibold text-[#1E293B]">
           {doneCount}/{stages.length} 단계
         </p>
       </div>
@@ -335,14 +352,14 @@ function AnalysisProgressPanel({ job }) {
               </div>
               <div className={`flex-1 min-w-0 ${isLast ? "" : "pb-4"}`}>
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className={`text-xs font-semibold ${muted ? "text-[#94A3B8]" : "text-[#1E293B]"}`}>
+                  <p className={`text-[15px] font-semibold ${muted ? "text-[#94A3B8]" : "text-[#1E293B]"}`}>
                     {info.label}
                   </p>
-                  <span className="text-[10px] text-[#94A3B8] whitespace-nowrap">
+                  <span className="text-xs text-[#64748B] whitespace-nowrap">
                     {stage.status === "failed" ? "실패" : formatDuration(elapsed)}
                   </span>
                 </div>
-                <p className="text-[11px] text-[#94A3B8] mb-1.5">{info.desc}</p>
+                <p className="text-xs text-[#64748B] mb-2">{info.desc}</p>
                 {!muted && <StageDetail stage={stage} />}
               </div>
             </li>

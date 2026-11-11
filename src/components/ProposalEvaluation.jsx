@@ -7,14 +7,36 @@ export function hasEvaluation(items) {
   return items.some((item) => item.feasibility || item.novelty || item.noveltyMissingReason);
 }
 
-// 결과 목록 카드에 붙는 판정 배지 두 개
-export function EvaluationBadges({ item }) {
-  if (!item.feasibility && !item.novelty && !item.noveltyMissingReason) return null;
+// 아직 심화 검증(CoT4·CoT5)을 하지 않은 아이디어 / 검증 중인 아이디어 표시
+function PendingBadge({ verifying }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-2 py-0.5 text-xs font-medium text-[#64748B] whitespace-nowrap">
+      {verifying ? (
+        <span className="w-3 h-3 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
+      ) : (
+        <span className="w-3.5 h-3.5 rounded-full border border-[#CBD5E1] bg-white" />
+      )}
+      {verifying ? "검증 중" : "검증 전"}
+    </span>
+  );
+}
+
+// 결과 목록 카드에 붙는 판정 배지 두 개 (검증 전이면 "검증 전" 하나)
+export function EvaluationBadges({ item, verifying = false }) {
+  if (!item.feasibility && !item.novelty && !item.noveltyMissingReason) {
+    if (!item.verifiable && !verifying) return null;
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+        <span className="text-xs text-[#64748B]">실현가능성·신규성</span>
+        <PendingBadge verifying={verifying} />
+      </div>
+    );
+  }
   return (
     <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-      <span className="text-[10px] text-[#94A3B8]">실현가능성</span>
+      <span className="text-xs text-[#64748B]">실현가능성</span>
       <VerdictBadge value={item.feasibility?.classification} fallbackLabel="판정 없음" />
-      <span className="text-[10px] text-[#94A3B8] ml-1">신규성</span>
+      <span className="text-xs text-[#64748B] ml-1">신규성</span>
       <VerdictBadge value={item.novelty?.classification} fallbackLabel={item.noveltyMissingReason ?? "판정 없음"} />
     </div>
   );
@@ -33,11 +55,11 @@ function countBy(items, pick, order) {
 function SummaryRow({ label, entries }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="w-16 shrink-0 text-[11px] font-semibold text-[#475569]">{label}</span>
+      <span className="w-16 shrink-0 text-xs font-semibold text-[#475569]">{label}</span>
       {entries.map(({ key, count }) => (
-        <span key={key} className="flex items-center gap-1 text-[11px] text-[#64748B]">
+        <span key={key} className="flex items-center gap-1 text-xs text-[#64748B]">
           <span
-            className="w-3 h-3 rounded-full flex items-center justify-center text-[8px] font-bold text-white"
+            className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold text-white"
             style={{ backgroundColor: VERDICT_STYLE[key].color }}
           >
             {VERDICT_STYLE[key].icon}
@@ -52,11 +74,11 @@ function SummaryRow({ label, entries }) {
 
 // 우려 항목 칸: 있음 = 채운 점 + "우려", 없음 = 빈 원 + "없음" (모양과 글자로도 구분)
 function ConcernCell({ concern }) {
-  if (!concern) return <span className="text-[11px] text-[#CBD5E1]">-</span>;
+  if (!concern) return <span className="text-xs text-[#CBD5E1]">-</span>;
   const present = Boolean(concern.present);
   return (
     <span
-      className="inline-flex items-center gap-1 text-[11px] text-[#475569]"
+      className="inline-flex items-center gap-1 text-xs text-[#475569]"
       title={concern.explanation || (present ? "우려 있음" : "우려 없음")}
     >
       <span
@@ -73,7 +95,7 @@ function ConcernCell({ concern }) {
 }
 
 // 제안 × 판정 비교표. 행을 누르면 해당 제안 상세를 연다.
-export function ProposalComparisonTable({ items, onSelect }) {
+export function ProposalComparisonTable({ items, onSelect, verifyingIds }) {
   const feasibilitySummary = countBy(
     items,
     (item) => item.feasibility?.classification,
@@ -95,7 +117,7 @@ export function ProposalComparisonTable({ items, onSelect }) {
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-[#E2E8F0] text-[10px] font-semibold text-[#64748B]">
+            <tr className="border-b border-[#E2E8F0] text-xs font-semibold text-[#64748B]">
               <th className="py-2 pr-2 font-semibold">제안</th>
               <th className="py-2 pr-2 font-semibold">실현가능성</th>
               {Object.values(CONCERN_LABELS).map((label) => (
@@ -115,12 +137,16 @@ export function ProposalComparisonTable({ items, onSelect }) {
                   className="border-b border-[#F1F5F9] cursor-pointer hover:bg-[#FAFAFF]"
                   title={item.title}
                 >
-                  <td className="py-2 pr-2 text-[11px] font-semibold text-[#1E293B] whitespace-nowrap">제안 {i + 1}</td>
+                  <td className="py-2 pr-2 text-xs font-semibold text-[#1E293B] whitespace-nowrap">제안 {item.proposalId ?? i + 1}</td>
                   <td className="py-2 pr-2">
                     <div className="flex flex-col items-start gap-0.5">
-                      <VerdictBadge value={item.feasibility?.classification} fallbackLabel="판정 없음" />
+                      {item.feasibility ? (
+                        <VerdictBadge value={item.feasibility.classification} fallbackLabel="판정 없음" />
+                      ) : (
+                        <PendingBadge verifying={verifyingIds?.has(item.proposalId)} />
+                      )}
                       {confidence != null && (
-                        <span className="text-[10px] text-[#94A3B8]">확신도 {Math.round(confidence * 100)}%</span>
+                        <span className="text-xs text-[#64748B]">확신도 {Math.round(confidence * 100)}%</span>
                       )}
                     </div>
                   </td>
@@ -131,12 +157,16 @@ export function ProposalComparisonTable({ items, onSelect }) {
                   ))}
                   <td className="py-2 pr-2">
                     <div className="flex flex-col items-start gap-0.5">
-                      <VerdictBadge
-                        value={item.novelty?.classification}
-                        fallbackLabel={item.noveltyMissingReason ?? "판정 없음"}
-                      />
+                      {item.feasibility ? (
+                        <VerdictBadge
+                          value={item.novelty?.classification}
+                          fallbackLabel={item.noveltyMissingReason ?? "판정 없음"}
+                        />
+                      ) : (
+                        <span className="text-xs text-[#CBD5E1]">-</span>
+                      )}
                       {item.novelty?.evaluated_paper_count != null && (
-                        <span className="text-[10px] text-[#94A3B8]">논문 {item.novelty.evaluated_paper_count}편과 비교</span>
+                        <span className="text-xs text-[#64748B]">논문 {item.novelty.evaluated_paper_count}편과 비교</span>
                       )}
                     </div>
                   </td>
@@ -146,7 +176,7 @@ export function ProposalComparisonTable({ items, onSelect }) {
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-[#94A3B8]">우려 항목에 마우스를 올리면 CoT4의 판단 근거가 보여요. 행을 누르면 제안 상세가 열립니다.</p>
+      <p className="text-xs text-[#64748B]">우려 항목에 마우스를 올리면 CoT4의 판단 근거가 보여요. 행을 누르면 제안 상세가 열립니다.</p>
     </div>
   );
 }

@@ -32,9 +32,9 @@ export const CONCERN_LABELS = {
 export function VerdictBadge({ value, fallbackLabel }) {
   const style = VERDICT_STYLE[value] ?? { label: fallbackLabel ?? value ?? "-", icon: "–", color: "#94A3B8" };
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[#E2E8F0] bg-white px-2 py-0.5 text-[11px] font-medium text-[#334155] whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 rounded-full border border-[#E2E8F0] bg-white px-2 py-0.5 text-xs font-medium text-[#334155] whitespace-nowrap">
       <span
-        className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold text-white"
+        className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
         style={{ backgroundColor: style.color }}
       >
         {style.icon}

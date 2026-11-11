@@ -42,6 +42,8 @@ function AlertModal({ onClose }) {
 
   const openResult = (n) => {
     onClose();
+    // 심화 검증 결과는 열려 있는 로드맵 화면에 바로 합쳐지므로, 이미 로드맵에 있으면 이동하지 않는다
+    if (n.kind === "verify" && window.location.pathname === "/roadmap") return;
     navigate("/roadmap", { state: { query: n.query } });
   };
 
@@ -86,11 +88,18 @@ function AlertModal({ onClose }) {
                 className="flex-1 min-w-0 text-left"
               >
                 <p className="text-sm font-medium text-[#1E293B]">
-                  {n.succeeded ? "갭 분석이 끝났어요" : "갭 분석이 멈췄어요"}
+                  {n.kind === "verify"
+                    ? n.succeeded
+                      ? "아이디어 검증이 끝났어요"
+                      : "아이디어 검증이 멈췄어요"
+                    : n.succeeded
+                      ? "갭 분석이 끝났어요"
+                      : "갭 분석이 멈췄어요"}
                 </p>
                 <p className="text-xs text-[#64748B] mt-0.5 truncate">
                   {n.query ? `'${n.query}'` : "검색어 없음"}
                   {n.paperCount ? ` · 논문 ${n.paperCount}편` : ""}
+                  {n.ideaCount ? ` · 아이디어 ${n.ideaCount}개` : ""}
                   {` · ${timeAgo(n.createdAt)}`}
                 </p>
                 <p className="text-xs text-[#4F46E5] mt-1">

@@ -485,7 +485,7 @@ function TopicNode({ data }) {
         }`}
     >
       <AllHandles />
-      <span className="text-white text-[11.5px] font-medium px-4 truncate">
+      <span className="text-white text-[13px] font-medium px-4 truncate">
         {data.label}
       </span>
       {/* 논문 수 뱃지 */}
@@ -519,7 +519,7 @@ function PaperNode({ data }) {
     >
       <AllHandles />
       {data.title ? (
-        <p className="text-[10px] font-medium text-[#1E293B] leading-snug line-clamp-2">
+        <p className="text-xs font-medium text-[#1E293B] leading-snug line-clamp-2">
           {data.title}
         </p>
       ) : (
@@ -757,23 +757,48 @@ const CHART_COLORS = [
 // 교차 비교(CoT3)는 최소 2편이 필요하다
 const MIN_GAP_PAPERS = 2;
 
+// CoT4에서 이 판정을 받은 제안만 CoT5(신규성)로 넘어간다 (AI 서버 FILTERED_GATE_CLASSIFICATIONS와 같다)
+const CoT4_PASSING = ["FEASIBLE", "QUESTIONABLE"];
+
+// 심화 검증 결과({ gate, CoT4, CoT5 })를 기본 분석 결과(gap_content)에 합친다.
+// 같은 proposal_id의 이전 판정은 새 판정으로 바꾼다. 반환은 JSON 문자열(gap_content와 같은 형식).
+function mergeVerification(content, verification) {
+  const base = parseJsonContent(content);
+  if (!base || !verification) return content;
+  const upsert = (prev, next) => {
+    const ids = new Set(next.map((r) => r.proposal_id));
+    return [...(prev ?? []).filter((r) => !ids.has(r.proposal_id)), ...next];
+  };
+  const cot4 = verification.CoT4?.results ?? [];
+  const cot5 = verification.CoT5?.results ?? [];
+  return JSON.stringify({
+    ...base,
+    CoT4: { results: upsert(base.CoT4?.results, cot4) },
+    CoT5: {
+      status: "completed",
+      results: upsert(base.CoT5?.results, cot5),
+    },
+  });
+}
+
 // GAP 분석 결과 JSON 파싱 — 마크다운 코드블록이 포함되어 있을 수 있어 제거 후 파싱
+function parseJsonContent(val) {
+  if (typeof val !== "string") return val;
+  // ```json ... ``` 형식 제거
+  const stripped = val
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim();
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    return null;
+  }
+}
+
 function parseGapContent(content) {
   if (!content) return [];
-  const tryParse = (val) => {
-    if (typeof val !== "string") return val;
-    // ```json ... ``` 형식 제거
-    const stripped = val
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```\s*$/, "")
-      .trim();
-    try {
-      return JSON.parse(stripped);
-    } catch {
-      return null;
-    }
-  };
-  const parsed = tryParse(content);
+  const parsed = parseJsonContent(content);
   if (!parsed) return [{ title: "분석 결과", description: content }];
 
   const firstSentence = (text) => {
@@ -795,26 +820,41 @@ function parseGapContent(content) {
     noveltyAssessment: item.novelty_assessment ?? null,
   });
 
-  // CoT4 결과는 제안과 같은 순서로 하나씩, CoT5 결과는 CoT4를 통과한 제안만 있으므로 제목(idea_title)으로 맞춘다.
-  // 두 단계 모두 proposed_direction 첫 줄로 같은 제목을 만든다.
+  // CoT4·CoT5 결과는 원래 제안 번호(proposal_id)로 맞춘다. 사용자가 고른 제안만 검증하므로 순서로는 맞출 수 없다.
+  // proposal_id가 없는 예전 결과(전 제안을 한 번에 검증)는 CoT4는 순서로, CoT5는 제목(idea_title)으로 맞춘다.
   const cot4Results = parsed?.CoT4?.results ?? [];
   const cot5 = parsed?.CoT5 ?? null;
   const cot5Results = cot5?.results ?? [];
   const withEvaluation = (item, i) => {
-    const feasibility = cot4Results[i] ?? null;
+    const proposalId = item.id ?? i + 1;
+    const feasibility =
+      cot4Results.find((r) => r.proposal_id === proposalId) ??
+      cot4Results.find((r, j) => r.proposal_id == null && j === i) ??
+      null;
     const novelty = feasibility
-      ? (cot5Results.find((r) => r.idea_title === feasibility.idea_title) ??
+      ? (cot5Results.find((r) => r.proposal_id === proposalId) ??
+        cot5Results.find(
+          (r) => r.proposal_id == null && r.idea_title === feasibility.idea_title,
+        ) ??
         null)
       : null;
-    // CoT5 판정이 없을 때의 사유: 전체 건너뜀 / 이 제안만 CoT4에서 걸러짐
-    const noveltyMissingReason = !cot5
-      ? null
-      : cot5.status === "skipped"
-        ? "건너뜀"
-        : novelty
-          ? null
+    // CoT5 판정이 없을 때의 사유: CoT4에서 걸러짐 / 건너뜀. 아직 검증하지 않은 제안은 사유 없음("검증 전")
+    const noveltyMissingReason =
+      !feasibility || novelty
+        ? null
+        : CoT4_PASSING.includes(feasibility.classification)
+          ? "건너뜀"
           : "CoT4 미통과";
-    return { ...normalise(item), feasibility, novelty, noveltyMissingReason };
+    return {
+      ...normalise(item),
+      proposalId,
+      // 심화 검증(CoT4 → CoT5) 요청에 그대로 보낼 원래 제안
+      proposal: item,
+      verifiable: Boolean(item.background_and_gap && item.proposed_direction),
+      feasibility,
+      novelty,
+      noveltyMissingReason,
+    };
   };
 
   // 응답 배열 구조가 다를 수 있어 여러 키로 시도
@@ -961,7 +1001,7 @@ function PaperSelectModal({
             {selectedIds.size >= MIN_GAP_PAPERS ? (
               <>
                 <p className="text-xs font-semibold text-[#1E293B]">
-                  선택 {selectedIds.size}편 · 7단계 검증 · 보통 5~10분
+                  선택 {selectedIds.size}편 · 5단계 분석 · 보통 2~3분
                 </p>
                 <p className="text-[11px] text-[#64748B] mt-0.5">
                   다른 페이지에 다녀와도 이어서 볼 수 있고, 끝나면 알려드려요.
@@ -1086,6 +1126,11 @@ function TopicDetailModal({ item, index, isBookmarked, onBookmark, onClose }) {
               </button>
             ))}
           </div>
+        )}
+        {!hasEvidence && item.verifiable && (
+          <p className="mb-4 rounded-lg bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#64748B]">
+            아직 실현가능성·신규성을 검증하지 않은 아이디어예요. 목록에서 선택해 검증하면 근거를 볼 수 있어요.
+          </p>
         )}
         {hasEvidence && tab === "feasibility" ? (
           <FeasibilityEvidence feasibility={item.feasibility} />
@@ -1389,6 +1434,22 @@ function RoadmapFlow({
   const [gapRetryable, setGapRetryable] = useState(false);
   // 오른쪽 결과 보기 방식 — 목록 / 비교표(CoT4·CoT5 판정을 제안별로 나란히)
   const [resultView, setResultView] = useState("list");
+  // 기본 분석 결과 원문(gap_content). 심화 검증 결과를 여기에 합쳐 다시 화면에 그린다.
+  const gapContentRef = useRef(null);
+  // 심화 검증: 사용자가 고른 아이디어만 CoT4(실현가능성) → CoT5(신규성)로 검증한다
+  const [selectedProposalIds, setSelectedProposalIds] = useState(new Set());
+  const [verifyingIds, setVerifyingIds] = useState(new Set());
+  const [verifyJob, setVerifyJob] = useState(null);
+  const [verifyError, setVerifyError] = useState("");
+  const verifyTokenRef = useRef(0);
+  // 분석을 시작했거나 결과가 있으면 '분석 모드' 배치(왼쪽 고정 분석 과정 + 줄인 그래프)
+  const analysisMode = Boolean(gapJob || gapLoading || gapItems.length > 0);
+  const { fitView: fitGraph } = useReactFlow();
+  // 그래프 높이가 바뀌면 화면에 맞게 다시 배치한다
+  useEffect(() => {
+    const timer = setTimeout(() => fitGraph({ padding: 0.25, duration: 300 }), 120);
+    return () => clearTimeout(timer);
+  }, [analysisMode, fitGraph]);
   // 폴링 루프를 식별하는 토큰 — 새 분석을 시작하면 이전 루프가 멈춘다
   const pollTokenRef = useRef(0);
   // 페이지를 떠나면 폴링을 멈춘다. (StrictMode·HMR의 정리→재실행에서는 다시 true가 되므로 끊기지 않는다)
@@ -1448,6 +1509,7 @@ function RoadmapFlow({
         paperCount: saved?.paperIds?.length,
       });
       if (job.status === "completed") {
+        gapContentRef.current = job.gap_content;
         setGapItems(parseGapContent(job.gap_content));
       } else {
         // 어느 단계에서 왜 멈췄는지 안내 (원문 부족·후보 없음·시간 초과·단계 실패)
@@ -1484,6 +1546,13 @@ function RoadmapFlow({
       setGapRetryable(false);
       setGapItems([]);
       setGapJob(null);
+      gapContentRef.current = null;
+      // 이전 분석의 심화 검증은 멈추고 선택을 비운다
+      verifyTokenRef.current += 1;
+      setSelectedProposalIds(new Set());
+      setVerifyingIds(new Set());
+      setVerifyJob(null);
+      setVerifyError("");
       setLeftTab("progress");
       let jobId;
       try {
@@ -1528,6 +1597,122 @@ function RoadmapFlow({
     runGapAnalysis(selectedIds);
   }, [selectedIds, runGapAnalysis]);
 
+  // 검증할 아이디어 선택 — 아직 검증하지 않았고 검증 중이 아닌 아이디어만 고를 수 있다
+  const selectableProposals = gapItems.filter(
+    (item) =>
+      item.verifiable && !item.feasibility && !verifyingIds.has(item.proposalId),
+  );
+  const toggleProposal = useCallback((proposalId) => {
+    setSelectedProposalIds((prev) => {
+      const next = new Set(prev);
+      next.has(proposalId) ? next.delete(proposalId) : next.add(proposalId);
+      return next;
+    });
+  }, []);
+  const allProposalsSelected =
+    selectableProposals.length > 0 &&
+    selectableProposals.every((item) => selectedProposalIds.has(item.proposalId));
+  const toggleAllProposals = () => {
+    setSelectedProposalIds(
+      allProposalsSelected
+        ? new Set()
+        : new Set(selectableProposals.map((item) => item.proposalId)),
+    );
+  };
+
+  // 심화 검증 작업을 끝날 때까지 2초마다 조회하고, 결과를 기본 분석 결과에 합친다
+  const pollVerifyJob = useCallback(async (jobId, token, ids, query) => {
+    const isCurrent = () =>
+      mountedRef.current && verifyTokenRef.current === token;
+    const finish = () =>
+      setVerifyingIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+    let job;
+    let failures = 0;
+    try {
+      while (isCurrent()) {
+        try {
+          job = await gapApi.getAnalysisJob(jobId);
+          failures = 0;
+        } catch (error) {
+          if (error?.response?.status === 404 || ++failures >= 5) throw error;
+        }
+        if (!isCurrent()) return;
+        if (job) setVerifyJob(job);
+        if (job && !["queued", "running"].includes(job.status)) break;
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      if (!isCurrent() || !job) return;
+      notifyAnalysisFinished({
+        jobId,
+        kind: "verify",
+        succeeded: job.status === "completed",
+        query,
+        paperCount: null,
+        ideaCount: ids.length,
+      });
+      if (job.status === "completed" && job.verification) {
+        gapContentRef.current = mergeVerification(
+          gapContentRef.current,
+          job.verification,
+        );
+        setGapItems(parseGapContent(gapContentRef.current));
+      } else {
+        const stopped = (job.stages ?? []).find((s) => s.status === "failed");
+        setVerifyError(
+          job.status === "timeout"
+            ? "검증 시간이 초과됐어요. 고른 아이디어 수를 줄여 다시 시도해 주세요."
+            : `${stopped ? `${stopped.stage} 단계에서 ` : ""}검증이 멈췄어요. 잠시 후 다시 시도해 주세요.`,
+        );
+      }
+    } catch {
+      if (isCurrent()) {
+        setVerifyError("분석 서버와 연결이 끊겼어요. 잠시 후 다시 시도해 주세요.");
+      }
+    } finally {
+      if (isCurrent()) finish();
+    }
+  }, []);
+
+  // 고른 아이디어만 심화 검증 시작. AI 서버도 검증을 한 번에 1건씩 실행하므로 진행 중이면 새로 시작하지 않는다.
+  const runVerify = useCallback(async () => {
+    if (verifyingIds.size > 0) return;
+    const targets = gapItems.filter(
+      (item) =>
+        selectedProposalIds.has(item.proposalId) &&
+        item.verifiable &&
+        !item.feasibility &&
+        !verifyingIds.has(item.proposalId),
+    );
+    if (!targets.length) return;
+    const ids = targets.map((item) => item.proposalId);
+    const token = ++verifyTokenRef.current;
+    requestAnalysisNotification();
+    setVerifyError("");
+    setVerifyJob(null);
+    setVerifyingIds((prev) => new Set([...prev, ...ids]));
+    setSelectedProposalIds(new Set());
+    setLeftTab("progress");
+    let jobId;
+    try {
+      ({ jobId } = await gapApi.startVerifyJob(targets.map((item) => item.proposal)));
+    } catch {
+      if (verifyTokenRef.current === token) {
+        setVerifyError("검증을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.");
+        setVerifyingIds((prev) => {
+          const next = new Set(prev);
+          ids.forEach((id) => next.delete(id));
+          return next;
+        });
+      }
+      return;
+    }
+    await pollVerifyJob(jobId, token, ids, searchQuery);
+  }, [gapItems, selectedProposalIds, verifyingIds, searchQuery, pollVerifyJob]);
+
   // GAP 아이디어 북마크 토글 — 낙관적 업데이트 후 서버 ID 저장
   const toggleBookmark = useCallback(
     async (i) => {
@@ -1568,11 +1753,404 @@ function RoadmapFlow({
     [bookmarked, bookmarkIdMap, gapItems, searchQuery],
   );
 
+  // 분석을 시작하면(또는 결과가 있으면) 분석 과정을 왼쪽 고정 열로 옮기고, 그래프 높이를 줄여 추천 아이디어를 위로 올린다
+  // ReactFlow 그래프
+  const graphPanel = (
+    <div
+      className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden"
+      style={
+        analysisMode
+          ? { height: "420px" }
+          : { height: "calc(100vh - 260px)", minHeight: "500px" }
+      }
+    >
+      <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#F1F5F9]">
+        <div className="flex items-center gap-2">
+          <svg
+            className="w-4 h-4 text-[#6366F1]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 10V3L4 14h7v7l9-11h-7z"
+            />
+          </svg>
+          <span className="font-semibold text-[#1E293B] text-sm">
+            연구 로드맵
+          </span>
+        </div>
+        <span className="text-xs text-[#64748B]">
+          토픽 노드를 클릭하면 논문이 펼쳐져요 · 확대·축소는 ⌘(Ctrl) + 휠
+        </span>
+      </div>
+      <div style={{ height: "calc(100% - 57px)" }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.25 }}
+          minZoom={0.15}
+          maxZoom={2.5}
+          // 휠은 페이지 스크롤에 양보하고, ⌘(Ctrl)+휠이나 트랙패드 핀치로만 확대·축소한다
+          zoomOnScroll={false}
+          preventScrolling={false}
+          zoomActivationKeyCode={["Meta", "Control"]}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background color="#E2E8F0" gap={20} />
+          <Controls showInteractive={false} />
+        </ReactFlow>
+      </div>
+    </div>
+  );
+
+  // 왼쪽: 분석 과정(단계별 검증 결과) / 토픽별 점유율 — 분석을 시작하면 탭이 생긴다
+  // min-w-0: 긴 논문 제목(말줄임)이 패널 폭을 넘지 않도록
+  const sidePanel = (
+      <div
+        className="min-w-0 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6"
+        style={analysisMode ? undefined : { flex: "0 0 44%" }}
+      >
+        {gapJob || gapLoading ? (
+          <div className="flex items-center gap-1 mb-5 bg-[#F1F5F9] rounded-lg p-1 w-fit">
+            {[
+              { key: "progress", label: "분석 과정" },
+              { key: "share", label: "해당 계층까지의 점유율" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setLeftTab(tab.key)}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${
+                  leftTab === tab.key
+                    ? "bg-white text-[#1E293B] shadow-sm"
+                    : "text-[#64748B] hover:text-[#1E293B]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <h3 className="text-sm font-semibold text-[#1E293B] mb-5">
+            해당 계층까지의 점유율
+          </h3>
+        )}
+        {(gapJob || gapLoading) && leftTab === "progress" ? (
+          gapJob ? (
+            <div
+              className="overflow-y-auto paper-scroll pr-1"
+              // 왼쪽 고정 열 안에서만 스크롤 (화면 높이 - 상단 여백·탭)
+              style={{ maxHeight: "calc(100vh - 150px)" }}
+            >
+              <AnalysisProgressPanel job={gapJob} />
+              {/* 고른 아이디어의 심화 검증(CoT4 → CoT5) 진행 상황 */}
+              {(verifyJob || verifyingIds.size > 0) && (
+                <div className="mt-5 pt-4 border-t border-[#E2E8F0]">
+                  <p className="text-xs font-semibold text-[#1E293B] mb-3">
+                    심화 검증 · CoT4 실현가능성 → CoT5 신규성
+                  </p>
+                  {verifyJob ? (
+                    <AnalysisProgressPanel job={verifyJob} />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
+                      <p className="text-xs text-[#64748B]">검증 작업을 시작하는 중입니다...</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 py-6">
+              <div className="w-4 h-4 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-[#64748B]">
+                분석 작업을 시작하는 중입니다...
+              </p>
+            </div>
+          )
+        ) : (
+          <>
+            <div className="flex items-end justify-center gap-5 h-36 mb-4">
+              {distribution.map((d) => (
+                <div
+                  key={d.label}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <span className="text-xs font-semibold text-[#334155]">
+                    {d.count}
+                  </span>
+                  <div
+                    style={{
+                      // 최댓값 기준 상대 높이 계산, 최소 8px 보장
+                      height: `${Math.max((d.count / distMax) * 112, 8)}px`,
+                      backgroundColor: d.color,
+                      width: "48px",
+                      borderRadius: "4px 4px 0 0",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-[#F1F5F9] pt-3">
+              <p className="text-xs text-[#64748B]">
+                총 집계된 논문 수:{" "}
+                <span className="font-bold text-[#3B82F6]">{distTotal}</span>
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                {distribution.map((d) => (
+                  <div key={d.label} className="flex items-center gap-1.5">
+                    <div
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: d.color }}
+                    />
+                    <span className="text-xs text-[#64748B]">{d.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+  );
+
+  // CLIP 갭 아이디어 추천 패널
+  const ideasPanel = (
+      <div className="flex-1 min-w-0 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <h3 className="text-[15px] font-semibold text-[#1E293B]">
+              CLIP의 추천 아이디어
+            </h3>
+            {/* 검증 결과(CoT4·CoT5)가 있으면 목록/비교표 전환 */}
+            {!gapLoading && hasEvaluation(gapItems) && (
+              <div className="flex items-center gap-1 bg-[#F1F5F9] rounded-lg p-0.5">
+                {[
+                  { key: "list", label: "목록" },
+                  { key: "table", label: "비교표" },
+                ].map((view) => (
+                  <button
+                    key={view.key}
+                    onClick={() => setResultView(view.key)}
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-colors ${
+                      resultView === view.key
+                        ? "bg-white text-[#1E293B] shadow-sm"
+                        : "text-[#64748B] hover:text-[#1E293B]"
+                    }`}
+                  >
+                    {view.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* 결과가 있을 때만 재추천 버튼 표시 */}
+          {gapItems.length > 0 && (
+            <button
+              onClick={() => setShowPaperModal(true)}
+              disabled={gapLoading}
+              className="text-xs px-3 py-1.5 rounded-full bg-[#EEF2FF] text-[#4F46E5] font-medium hover:bg-[#E0E7FF] transition-colors disabled:opacity-50"
+            >
+              주제 재추천
+            </button>
+          )}
+        </div>
+
+        {/* 초기 상태 — 아직 분석 안 함 */}
+        {!gapLoading && !gapItems.length && !gapError && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 py-6">
+            <div className="mt-2">
+              <button
+                onClick={() => setShowPaperModal(true)}
+                className="text-sm font-semibold px-6 py-2.5 rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors"
+              >
+                논문들을 선택하여 퓨처워크를 탐색하세요
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 분석 중 로딩 스피너 */}
+        {gapLoading && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
+            <div className="w-6 h-6 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-[#64748B]">
+              퓨쳐워크 아이디어를 분석하는 중입니다...
+            </p>
+            <p className="text-xs text-[#64748B]">
+              보통 2~3분 걸려요. 단계별 결과는 왼쪽 '분석 과정'에서 바로 확인할 수 있어요
+            </p>
+          </div>
+        )}
+
+        {/* 에러 상태 */}
+        {gapError && !gapLoading && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
+            <p className="text-xs text-red-600 text-center leading-relaxed max-w-[420px]">
+              {gapError}
+            </p>
+            {gapJob && (
+              <p className="text-xs text-[#64748B]">
+                멈춘 단계는 왼쪽 '분석 과정'에서 확인할 수 있어요
+              </p>
+            )}
+            <div className="flex items-center gap-2">
+              {gapRetryable && lastPaperIdsRef.current?.length >= MIN_GAP_PAPERS && (
+                <button
+                  onClick={() => runGapAnalysis(new Set(lastPaperIdsRef.current))}
+                  className="text-xs px-4 py-2 rounded-lg bg-[#4F46E5] text-white font-medium hover:bg-[#4338CA] transition-colors"
+                >
+                  같은 논문으로 다시 시도
+                </button>
+              )}
+              <button
+                onClick={() => setShowPaperModal(true)}
+                className="text-xs px-4 py-2 rounded-lg bg-[#EEF2FF] text-[#4F46E5] font-medium hover:bg-[#E0E7FF] transition-colors"
+              >
+                다른 논문 선택
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 심화 검증 — 아이디어를 골라 CoT4(실현가능성) → CoT5(신규성) 검증 */}
+        {!gapLoading &&
+          gapItems.length > 0 &&
+          (selectableProposals.length > 0 || verifyingIds.size > 0) && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-[#F8FAFC] px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[#1E293B]">
+                  더 깊게 보고 싶은 아이디어를 골라 검증해 보세요
+                </p>
+                <p className="text-xs text-[#64748B] mt-0.5">
+                  CoT4 실현가능성 → CoT5 신규성 · 2개 기준 약 2분
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {selectableProposals.length > 0 && (
+                  <label className="flex items-center gap-1.5 text-xs text-[#475569] cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={allProposalsSelected}
+                      onChange={toggleAllProposals}
+                      disabled={verifyingIds.size > 0}
+                      className="w-3.5 h-3.5 accent-[#4F46E5]"
+                    />
+                    모두 선택
+                  </label>
+                )}
+                <button
+                  onClick={runVerify}
+                  disabled={selectedProposalIds.size === 0 || verifyingIds.size > 0}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors disabled:bg-[#C7D2FE] disabled:cursor-not-allowed"
+                >
+                  {verifyingIds.size > 0
+                    ? "검증 중…"
+                    : selectedProposalIds.size > 0
+                      ? `${selectedProposalIds.size}개 검증하기`
+                      : "검증하기"}
+                </button>
+              </div>
+            </div>
+          )}
+        {!gapLoading && verifyError && (
+          <p className="mb-3 text-xs text-red-600" role="alert">
+            {verifyError}
+          </p>
+        )}
+
+        {/* 분석 결과 목록 */}
+        {!gapLoading &&
+          gapItems.length > 0 &&
+          resultView === "table" &&
+          hasEvaluation(gapItems) && (
+            <div>
+              <ProposalComparisonTable
+                items={gapItems}
+                verifyingIds={verifyingIds}
+                onSelect={(i) =>
+                  setDetailItem({ item: gapItems[i], index: i })
+                }
+              />
+            </div>
+          )}
+        {!gapLoading &&
+          gapItems.length > 0 &&
+          (resultView === "list" || !hasEvaluation(gapItems)) && (
+            <div className="flex flex-col gap-2.5">
+              {gapItems.map((item, i) => {
+                const title = `${i + 1}. ${item.title ?? item.name ?? "추천 아이디어"}`;
+                const verifying = verifyingIds.has(item.proposalId);
+                const selectable =
+                  item.verifiable && !item.feasibility && !verifying && verifyingIds.size === 0;
+                return (
+                  <div
+                    key={i}
+                    onClick={() => setDetailItem({ item, index: i })}
+                    className="rounded-xl border border-[#E2E8F0] px-4 py-3 cursor-pointer hover:border-[#C7D2FE] hover:bg-[#FAFAFF] transition-colors"
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      {/* 검증할 아이디어 선택 (검증 전인 아이디어만) */}
+                      {item.verifiable && !item.feasibility && (
+                        <input
+                          type="checkbox"
+                          aria-label={`${i + 1}번 아이디어 검증 대상으로 선택`}
+                          checked={selectedProposalIds.has(item.proposalId)}
+                          disabled={!selectable}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleProposal(item.proposalId)}
+                          className="w-3.5 h-3.5 flex-shrink-0 accent-[#4F46E5] cursor-pointer disabled:cursor-not-allowed"
+                        />
+                      )}
+                      <p
+                        className="text-sm font-semibold text-[#1E293B] leading-snug"
+                        style={{
+                          flex: "1 1 0",
+                          minWidth: 0,
+                          overflow: "hidden",
+                          whiteSpace: "nowrap",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {title}
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleBookmark(i);
+                        }}
+                        className="p-0.5 flex-shrink-0"
+                      >
+                        <BookmarkIcon filled={bookmarked.has(i)} />
+                      </button>
+                    </div>
+                    <EvaluationBadges item={item} verifying={verifying} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+      </div>
+  );
+
   return (
     <div className="mx-auto max-w-screen-3xl px-8 py-8 flex flex-col gap-6">
       {/* 헤더 — 검색 키워드가 있으면 강조 표시 */}
       <div>
-        <h1 className="text-lg font-bold text-[#173355]">Research Roadmap</h1>
+        <h1 className="text-xl font-bold text-[#173355]">Research Roadmap</h1>
         <p className="mt-1 text-sm text-[#466084]">
           {searchQuery ? (
             <>
@@ -1622,313 +2200,27 @@ function RoadmapFlow({
         </div>
       )}
 
-      {/* ReactFlow 그래프 */}
-      <div
-        className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden"
-        style={{ height: "calc(100vh - 260px)", minHeight: "500px" }}
-      >
-        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#F1F5F9]">
-          <div className="flex items-center gap-2">
-            <svg
-              className="w-4 h-4 text-[#6366F1]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
-            <span className="font-semibold text-[#1E293B] text-sm">
-              연구 로드맵
-            </span>
+      {analysisMode ? (
+        <div className="flex gap-6 items-start">
+          {/* 분석 과정 — 왼쪽 고정 열 (페이지를 스크롤해도 계속 보인다) */}
+          <aside className="w-[380px] flex-shrink-0 sticky top-4 self-start">
+            {sidePanel}
+          </aside>
+          <div className="flex-1 min-w-0 flex flex-col gap-6">
+            {graphPanel}
+            {ideasPanel}
           </div>
-          <span className="text-xs text-[#94A3B8]">
-            토픽 노드를 클릭하여 논문을 펼쳐보세요
-          </span>
         </div>
-        <div style={{ height: "calc(100% - 57px)" }}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onNodeClick={onNodeClick}
-            nodeTypes={nodeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.25 }}
-            minZoom={0.15}
-            maxZoom={2.5}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background color="#E2E8F0" gap={20} />
-            <Controls showInteractive={false} />
-          </ReactFlow>
-        </div>
-      </div>
-
-      {/* 하단: 점유율 바 차트 + GAP 추천 */}
-      <div className="flex gap-6">
-        {/* 왼쪽: 분석 과정(단계별 검증 결과) / 토픽별 점유율 — 분석을 시작하면 탭이 생긴다 */}
-        {/* min-w-0: 긴 논문 제목(말줄임)이 패널 폭을 44%보다 넓히지 않도록 */}
-        <div
-          className="min-w-0 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6"
-          style={{ flex: "0 0 44%" }}
-        >
-          {gapJob || gapLoading ? (
-            <div className="flex items-center gap-1 mb-5 bg-[#F1F5F9] rounded-lg p-1 w-fit">
-              {[
-                { key: "progress", label: "분석 과정" },
-                { key: "share", label: "해당 계층까지의 점유율" },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setLeftTab(tab.key)}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${
-                    leftTab === tab.key
-                      ? "bg-white text-[#1E293B] shadow-sm"
-                      : "text-[#64748B] hover:text-[#1E293B]"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <h3 className="text-sm font-semibold text-[#1E293B] mb-5">
-              해당 계층까지의 점유율
-            </h3>
-          )}
-          {(gapJob || gapLoading) && leftTab === "progress" ? (
-            gapJob ? (
-              <div
-                className="overflow-y-auto paper-scroll pr-1"
-                style={{ maxHeight: "560px" }}
-              >
-                <AnalysisProgressPanel job={gapJob} />
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 py-6">
-                <div className="w-4 h-4 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
-                <p className="text-xs text-[#94A3B8]">
-                  분석 작업을 시작하는 중입니다...
-                </p>
-              </div>
-            )
-          ) : (
-            <>
-              <div className="flex items-end justify-center gap-5 h-36 mb-4">
-                {distribution.map((d) => (
-                  <div
-                    key={d.label}
-                    className="flex flex-col items-center gap-1"
-                  >
-                    <span className="text-xs font-semibold text-[#334155]">
-                      {d.count}
-                    </span>
-                    <div
-                      style={{
-                        // 최댓값 기준 상대 높이 계산, 최소 8px 보장
-                        height: `${Math.max((d.count / distMax) * 112, 8)}px`,
-                        backgroundColor: d.color,
-                        width: "48px",
-                        borderRadius: "4px 4px 0 0",
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-[#F1F5F9] pt-3">
-                <p className="text-xs text-[#64748B]">
-                  총 집계된 논문 수:{" "}
-                  <span className="font-bold text-[#3B82F6]">{distTotal}</span>
-                </p>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
-                  {distribution.map((d) => (
-                    <div key={d.label} className="flex items-center gap-1.5">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: d.color }}
-                      />
-                      <span className="text-xs text-[#64748B]">{d.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* CLIP 갭 아이디어 추천 패널 */}
-        <div className="flex-1 min-w-0 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h3 className="text-sm font-semibold text-[#1E293B]">
-                CLIP의 추천 아이디어
-              </h3>
-              {/* 검증 결과(CoT4·CoT5)가 있으면 목록/비교표 전환 */}
-              {!gapLoading && hasEvaluation(gapItems) && (
-                <div className="flex items-center gap-1 bg-[#F1F5F9] rounded-lg p-0.5">
-                  {[
-                    { key: "list", label: "목록" },
-                    { key: "table", label: "비교표" },
-                  ].map((view) => (
-                    <button
-                      key={view.key}
-                      onClick={() => setResultView(view.key)}
-                      className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors ${
-                        resultView === view.key
-                          ? "bg-white text-[#1E293B] shadow-sm"
-                          : "text-[#64748B] hover:text-[#1E293B]"
-                      }`}
-                    >
-                      {view.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* 결과가 있을 때만 재추천 버튼 표시 */}
-            {gapItems.length > 0 && (
-              <button
-                onClick={() => setShowPaperModal(true)}
-                disabled={gapLoading}
-                className="text-xs px-3 py-1.5 rounded-full bg-[#EEF2FF] text-[#4F46E5] font-medium hover:bg-[#E0E7FF] transition-colors disabled:opacity-50"
-              >
-                주제 재추천
-              </button>
-            )}
+      ) : (
+        <>
+          {graphPanel}
+          {/* 하단: 점유율 바 차트 + GAP 추천 */}
+          <div className="flex gap-6">
+            {sidePanel}
+            {ideasPanel}
           </div>
-
-          {/* 초기 상태 — 아직 분석 안 함 */}
-          {!gapLoading && !gapItems.length && !gapError && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-6">
-              <div className="mt-2">
-                <button
-                  onClick={() => setShowPaperModal(true)}
-                  className="text-sm font-semibold px-6 py-2.5 rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors"
-                >
-                  논문들을 선택하여 퓨처워크를 탐색하세요
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 분석 중 로딩 스피너 */}
-          {gapLoading && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <div className="w-6 h-6 border-2 border-[#6366F1] border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs text-[#94A3B8]">
-                퓨쳐워크 아이디어를 분석하는 중입니다...
-              </p>
-              <p className="text-[11px] text-[#94A3B8]">
-                단계별 검증 결과는 왼쪽 '분석 과정'에서 바로 확인할 수 있어요
-              </p>
-            </div>
-          )}
-
-          {/* 에러 상태 */}
-          {gapError && !gapLoading && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <p className="text-xs text-red-600 text-center leading-relaxed max-w-[420px]">
-                {gapError}
-              </p>
-              {gapJob && (
-                <p className="text-[11px] text-[#64748B]">
-                  멈춘 단계는 왼쪽 '분석 과정'에서 확인할 수 있어요
-                </p>
-              )}
-              <div className="flex items-center gap-2">
-                {gapRetryable && lastPaperIdsRef.current?.length >= MIN_GAP_PAPERS && (
-                  <button
-                    onClick={() => runGapAnalysis(new Set(lastPaperIdsRef.current))}
-                    className="text-xs px-4 py-2 rounded-lg bg-[#4F46E5] text-white font-medium hover:bg-[#4338CA] transition-colors"
-                  >
-                    같은 논문으로 다시 시도
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowPaperModal(true)}
-                  className="text-xs px-4 py-2 rounded-lg bg-[#EEF2FF] text-[#4F46E5] font-medium hover:bg-[#E0E7FF] transition-colors"
-                >
-                  다른 논문 선택
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 분석 결과 목록 */}
-          {!gapLoading &&
-            gapItems.length > 0 &&
-            resultView === "table" &&
-            hasEvaluation(gapItems) && (
-              <div
-                className="overflow-y-auto paper-scroll"
-                style={{ maxHeight: "560px" }}
-              >
-                <ProposalComparisonTable
-                  items={gapItems}
-                  onSelect={(i) =>
-                    setDetailItem({ item: gapItems[i], index: i })
-                  }
-                />
-              </div>
-            )}
-          {!gapLoading &&
-            gapItems.length > 0 &&
-            (resultView === "list" || !hasEvaluation(gapItems)) && (
-              <div
-                className="flex flex-col gap-2.5 overflow-y-auto paper-scroll"
-                style={{ maxHeight: "560px" }}
-              >
-                {gapItems.map((item, i) => {
-                  const title = `${i + 1}. ${item.title ?? item.name ?? "추천 아이디어"}`;
-                  return (
-                    <div
-                      key={i}
-                      onClick={() => setDetailItem({ item, index: i })}
-                      className="rounded-xl border border-[#E2E8F0] px-4 py-3 cursor-pointer hover:border-[#C7D2FE] hover:bg-[#FAFAFF] transition-colors"
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <p
-                          className="text-sm font-semibold text-[#1E293B] leading-snug"
-                          style={{
-                            flex: "1 1 0",
-                            minWidth: 0,
-                            overflow: "hidden",
-                            whiteSpace: "nowrap",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {title}
-                        </p>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleBookmark(i);
-                          }}
-                          className="p-0.5 flex-shrink-0"
-                        >
-                          <BookmarkIcon filled={bookmarked.has(i)} />
-                        </button>
-                      </div>
-                      <EvaluationBadges item={item} />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-        </div>
-      </div>
+        </>
+      )}
 
       {/* 논문 선택 모달 */}
       {showPaperModal && (
